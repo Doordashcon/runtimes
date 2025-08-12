@@ -2654,6 +2654,7 @@ dependencies = [
  "hex-literal",
  "log",
  "pallet-alliance",
+ "pallet-ambassador-governance",
  "pallet-asset-rate",
  "pallet-aura",
  "pallet-authorship",
@@ -8197,6 +8198,25 @@ dependencies = [
  "sp-crypto-hashing",
  "sp-io",
  "sp-runtime",
+]
+
+[[package]]
+name = "pallet-ambassador-governance"
+version = "1.0.0"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "pallet-balances",
+ "pallet-core-fellowship-ambassador",
+ "pallet-ranked-collective-ambassador",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core 36.1.0",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+ "sp-weights",
 ]
 
 [[package]]

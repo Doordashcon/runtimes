@@ -18,6 +18,7 @@ pub mod block_weights;
 pub mod cumulus_pallet_parachain_system;
 pub mod cumulus_pallet_xcmp_queue;
 pub mod extrinsic_weights;
+pub mod pallet_ambassador_governance;
 pub mod frame_system;
 pub mod frame_system_extensions;
 pub mod pallet_alliance;

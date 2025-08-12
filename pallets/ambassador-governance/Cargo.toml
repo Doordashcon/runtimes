@@ -1,0 +1,59 @@
+[package]
+name = "pallet-ambassador-governance"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Ambassador Fellowship governance mechanisms including emergency response, appeals, and cross-collective integration"
+readme = "README.md"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+codec = { features = ["derive"], workspace = true }
+scale-info = { features = ["derive"], workspace = true }
+frame-benchmarking = { optional = true, workspace = true }
+frame-support = { workspace = true }
+frame-system = { workspace = true }
+sp-runtime = { workspace = true }
+sp-std = { workspace = true }
+sp-io = { workspace = true }
+sp-core = { workspace = true }
+sp-weights = { workspace = true }
+pallet-ranked-collective-ambassador = { workspace = true }
+pallet-core-fellowship-ambassador = { optional = true, workspace = true }
+
+[dev-dependencies]
+sp-core = { workspace = true }
+sp-io = { workspace = true }
+pallet-balances = { workspace = true }
+
+[features]
+default = ["std"]
+std = [
+	"codec/std",
+	"frame-benchmarking?/std",
+	"frame-support/std",
+	"frame-system/std",
+	"pallet-balances/std",
+	"scale-info/std",
+	"sp-runtime/std",
+	"sp-std/std",
+	"sp-io/std",
+	"pallet-ranked-collective-ambassador/std",
+	"pallet-core-fellowship-ambassador/std",
+]
+runtime-benchmarks = [
+	"frame-benchmarking/runtime-benchmarks",
+	"frame-support/runtime-benchmarks",
+	"frame-system/runtime-benchmarks",
+	"pallet-balances/runtime-benchmarks",
+	"sp-runtime/runtime-benchmarks",
+]
+try-runtime = [
+	"frame-support/try-runtime",
+	"frame-system/try-runtime",
+	"pallet-balances/try-runtime",
+	"sp-runtime/try-runtime",
+]
