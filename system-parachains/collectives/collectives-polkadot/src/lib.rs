@@ -97,6 +97,9 @@ use frame_system::{
 use parachains_common::{
 	message_queue::*, AccountId, AuraId, Balance, BlockNumber, Hash, Header, Nonce, Signature,
 };
+use sp_runtime::traits::Verify;
+use frame_support::instances::Instance1;
+use pallet_identity::legacy::IdentityInfo;
 use sp_runtime::RuntimeDebug;
 use system_parachains_constants::{
 	polkadot::{account::*, consensus::*, currency::*, fee::WeightToFee},
@@ -114,6 +117,7 @@ pub use sp_runtime::BuildStorage;
 // Polkadot imports
 use pallet_xcm::{EnsureXcm, IsVoiceOfBody};
 use pallet_ambassador_governance;
+use pallet_identity;
 use polkadot_runtime_common::{BlockHashCount, SlowAdjustingFeeUpdate};
 use xcm::prelude::*;
 use xcm_runtime_apis::{
@@ -711,6 +715,35 @@ impl pallet_asset_rate::Config for Runtime {
 	type BenchmarkHelper = polkadot_runtime_common::impls::benchmarks::AssetRateArguments;
 }
 
+parameter_types! {
+	pub const MaxAdditionalFields: u32 = 100;
+	pub const MaxRegistrars: u32 = 20;
+	pub const MaxSubAccounts: u32 = 100;
+}
+
+impl pallet_identity::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
+	type BasicDeposit = DepositBase;
+	type ByteDeposit = DepositFactor;
+	type SubAccountDeposit = DepositFactor;
+	type MaxSubAccounts = MaxSubAccounts;
+	type MaxRegistrars = MaxRegistrars;
+	type Slashed = pallet_treasury::Pallet<Runtime, Instance1>;
+	type ForceOrigin = EnsureRoot<AccountId>;
+	type RegistrarOrigin = EnsureRoot<AccountId>;
+	type WeightInfo = pallet_identity::weights::SubstrateWeight<Runtime>;
+	type IdentityInformation = IdentityInfo<MaxAdditionalFields>;
+	type OffchainSignature = Signature;
+	type SigningPublicKey = <Signature as Verify>::Signer;
+	type UsernameAuthorityOrigin = EnsureRoot<AccountId>;
+	type PendingUsernameExpiration = ConstU32<100>;
+	type MaxSuffixLength = ConstU32<7>;
+	type MaxUsernameLength = ConstU32<32>;
+	type UsernameDeposit = DepositBase;
+	type UsernameGracePeriod = ConstU32<10>;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime
@@ -746,6 +779,7 @@ construct_runtime!(
 		Preimage: pallet_preimage = 43,
 		Scheduler: pallet_scheduler = 44,
 		AssetRate: pallet_asset_rate = 45,
+		Identity: pallet_identity = 46,
 
 		// The main stage.
 
@@ -1429,7 +1463,7 @@ impl pallet_ambassador_governance::Config for Runtime {
 	type MaxCommitteeMembers = MaxCommitteeMembers;
 	type MaxParticipants = MaxParticipants;
 	type WeightInfo = weights::pallet_ambassador_governance::WeightInfo<Runtime>;
-	type IdentityRegistrar = AmbassadorIdentityVerifier;
+	type IdentityRegistrar = AmbassadorIdentityVerifier<Runtime>;
 	type RankChecker = AmbassadorRankChecker;
 	type MinRankForProviderRegistry = ConstU16<{ ranks::ADVOCATE_AMBASSADOR }>;
 	type MinRankForReferral = ConstU16<{ ranks::ASSOCIATE_AMBASSADOR }>;

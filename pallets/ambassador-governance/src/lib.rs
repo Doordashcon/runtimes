@@ -1127,6 +1127,12 @@ pub mod pallet {
 			T::EmergencyOrigin::ensure_origin(origin.clone())?;
 			let initiator = ensure_signed(origin)?;
 
+			// Check that the caller has a verified identity
+			ensure!(
+				T::IdentityRegistrar::has_identity(&initiator),
+				Error::<T>::IdentityNotVerified
+			);
+
 			ensure!(
 				T::RankChecker::has_minimum_rank(
 					&initiator,
@@ -1184,6 +1190,9 @@ pub mod pallet {
 			// Check origin using CommitteeFormationOrigin filter
 			T::CommitteeFormationOrigin::ensure_origin(origin.clone())?;
 			let who = ensure_signed(origin)?;
+
+			// Check that the caller has a verified identity
+			ensure!(T::IdentityRegistrar::has_identity(&who), Error::<T>::IdentityNotVerified);
 
 			// Check that the caller has the minimum required rank
 			ensure!(
@@ -1247,6 +1256,9 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin.clone())?;
 
+			// Check that the caller has a verified identity
+			ensure!(T::IdentityRegistrar::has_identity(&who), Error::<T>::IdentityNotVerified);
+
 			Emergencies::<T>::try_mutate(emergency_id, |maybe_emergency| -> DispatchResult {
 				let emergency = maybe_emergency.as_mut().ok_or(Error::<T>::EmergencyNotFound)?;
 				ensure!(emergency.resolved_at.is_none(), Error::<T>::EmergencyAlreadyResolved);
@@ -1303,6 +1315,12 @@ pub mod pallet {
 			T::AppealSubmissionOrigin::ensure_origin(origin.clone())?;
 			let appellant = ensure_signed(origin)?;
 
+			// Check that the appellant has a verified identity
+			ensure!(
+				T::IdentityRegistrar::has_identity(&appellant),
+				Error::<T>::IdentityNotVerified
+			);
+
 			// Check that the appellant has the minimum required rank
 			ensure!(
 				T::RankChecker::has_minimum_rank(&appellant, T::MinRankToSubmitAppeal::get()),
@@ -1358,6 +1376,9 @@ pub mod pallet {
 			T::AppealCommitteeOrigin::ensure_origin(origin.clone())?;
 			let who = ensure_signed(origin)?;
 
+			// Check that the caller has a verified identity
+			ensure!(T::IdentityRegistrar::has_identity(&who), Error::<T>::IdentityNotVerified);
+
 			// Check that the caller has the minimum required rank
 			ensure!(
 				T::RankChecker::has_minimum_rank(&who, T::MinRankToFormAppealCommittee::get()),
@@ -1404,6 +1425,9 @@ pub mod pallet {
 			decision: AppealDecision,
 		) -> DispatchResult {
 			let who = ensure_signed(origin.clone())?;
+
+			// Check that the caller has a verified identity
+			ensure!(T::IdentityRegistrar::has_identity(&who), Error::<T>::IdentityNotVerified);
 
 			// Check if origin is a committee member
 			let committee = AppealCommittees::<T>::get(appeal_id)
@@ -1466,6 +1490,9 @@ pub mod pallet {
 		) -> DispatchResult {
 			T::IntegrationOrigin::ensure_origin(origin.clone())?;
 			let who = ensure_signed(origin)?;
+
+			// Check that the caller has a verified identity
+			ensure!(T::IdentityRegistrar::has_identity(&who), Error::<T>::IdentityNotVerified);
 
 			// Check that the caller has the minimum required rank
 			ensure!(
@@ -1542,11 +1569,14 @@ pub mod pallet {
 			evidence: Option<H256>,
 		) -> DispatchResult {
 			T::EmergencyOrigin::ensure_origin(origin.clone())?;
+			let issuer = ensure_signed(origin.clone())?;
+
+			// Check that the caller has a verified identity
+			ensure!(T::IdentityRegistrar::has_identity(&issuer), Error::<T>::IdentityNotVerified);
 
 			let bounded_reason: BoundedVec<_, _> =
 				reason.clone().try_into().map_err(|_| Error::<T>::TooManyCommitteeMembers)?;
 
-			let issuer = ensure_signed(origin.clone())?;
 			let discipline_details = DisciplineDetails {
 				subject: subject.clone(),
 				issuer,
@@ -1604,6 +1634,13 @@ pub mod pallet {
 			successor: Option<T::AccountId>,
 		) -> DispatchResult {
 			T::EmergencyOrigin::ensure_origin(origin.clone())?;
+			let initiator = ensure_signed(origin.clone())?;
+
+			// Check that the caller has a verified identity
+			ensure!(
+				T::IdentityRegistrar::has_identity(&initiator),
+				Error::<T>::IdentityNotVerified
+			);
 
 			let bounded_justification: BoundedVec<_, _> =
 				justification.clone().try_into().map_err(|_| Error::<T>::JustificationTooLong)?;
@@ -1658,6 +1695,9 @@ pub mod pallet {
 			expires_at: Option<T::BlockNumber>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
+
+			// Check that the caller has a verified identity
+			ensure!(T::IdentityRegistrar::has_identity(&who), Error::<T>::IdentityNotVerified);
 
 			let bounded_description: BoundedVec<_, _> = description
 				.clone()
@@ -1721,6 +1761,9 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
+			// Check that the caller has a verified identity
+			ensure!(T::IdentityRegistrar::has_identity(&who), Error::<T>::IdentityNotVerified);
+
 			let bounded_unique_id: BoundedVec<_, _> =
 				unique_id.clone().try_into().map_err(|_| Error::<T>::TooManyCommitteeMembers)?;
 
@@ -1775,6 +1818,10 @@ pub mod pallet {
 			avg_response_time: T::BlockNumber,
 		) -> DispatchResult {
 			T::EmergencyOrigin::ensure_origin(origin.clone())?;
+			let who = ensure_signed(origin.clone())?;
+
+			// Check that the caller has a verified identity
+			ensure!(T::IdentityRegistrar::has_identity(&who), Error::<T>::IdentityNotVerified);
 
 			GovernanceHealth::<T>::put(GovernanceHealthMetrics {
 				participation_rate,
@@ -1821,6 +1868,9 @@ pub mod pallet {
 			_evidence_hash: Option<H256>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
+
+			// Check that the caller has a verified identity
+			ensure!(T::IdentityRegistrar::has_identity(&who), Error::<T>::IdentityNotVerified);
 
 			// Ensure the caller has at least the minimum rank required to register a service provider
 			ensure!(
@@ -1900,6 +1950,9 @@ pub mod pallet {
 			compensation_details: Option<Vec<u8>>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
+
+			// Check that the caller has a verified identity
+			ensure!(T::IdentityRegistrar::has_identity(&who), Error::<T>::IdentityNotVerified);
 
 			// Ensure the caller has at least the minimum rank required to create a referral
 			ensure!(

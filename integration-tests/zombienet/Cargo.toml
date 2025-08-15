@@ -4,9 +4,15 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-subxt = { features = ["native"], workspace = true }
+subxt = { features = ["native", "substrate-compat"], workspace = true }
 tokio = { workspace = true }
 tracing-subscriber = { workspace = true }
 zombienet-sdk = { workspace = true }
 log = { workspace = true, default-features = true }
 anyhow = { workspace = true }
+sha3 = "0.10.8"
+futures = "0.3.28"
+parity-scale-codec = { version = "3.6.9", features = ["derive"] }
+sp-core = { version = "21.0.0" }
+sp-runtime = { version = "24.0.0" }
+serde_json = "1.0.108"

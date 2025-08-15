@@ -162,7 +162,7 @@ fn form_emergency_committee_works() {
 		let evidence = Some(random_hash());
 
 		assert_ok!(AmbassadorGovernance::<Runtime>::activate_emergency_protocol(
-			RuntimeOrigin::signed(1),
+			signed_origin(1),
 			emergency_type.clone(),
 			severity.clone(),
 			justification.clone(),
@@ -180,7 +180,7 @@ fn form_emergency_committee_works() {
 
 		// Execute
 		assert_ok!(AmbassadorGovernance::<Runtime>::form_emergency_committee(
-			RuntimeOrigin::signed(1),
+			signed_origin(1),
 			emergency_id,
 			members.clone()
 		));
@@ -625,7 +625,7 @@ fn resolve_emergency_fails_with_already_resolved_emergency() {
 			emergency_id,
 			abuse_detected,
 			resolution_summary.clone(),
-			evidence.clone()
+			evidence
 		));
 
 		// Try to resolve again
@@ -1599,7 +1599,7 @@ fn register_service_provider_fails_with_insufficient_rank() {
 fn register_service_provider_fails_with_unverified_identity() {
 	new_test_ext().execute_with(|| {
 		// Setup
-		let provider_account = 4; // Account WITHOUT verified identity
+		let provider_account = 11; // Account WITHOUT verified identity
 		let provider_name = create_provider_name(50);
 		let service_types = vec![ProfessionalServiceType::LegalFinancial];
 		let contact_info = create_contact_info(100);
@@ -1930,5 +1930,56 @@ fn professional_services_workflow_end_to_end() {
 		}
 
 		assert_eq!(found_referrals, 2, "Two ServiceReferralCreated events should be emitted");
+	});
+}
+
+#[test]
+fn identity_verification_is_enforced() {
+	new_test_ext().execute_with(|| {
+		// Account 1 has a verified identity (according to MockIdentityVerifier)
+		let account_with_identity = 1;
+
+		// Account 11 does not have a verified identity (according to MockIdentityVerifier)
+		let account_without_identity = 11;
+
+		// Test with account that has verified identity - should succeed
+		assert_ok!(AmbassadorGovernance::<Runtime>::submit_appeal(
+			signed_origin(account_with_identity),
+			b"Appeal decision hash".to_vec(),
+			b"Appeal justification with reference to off-chain evidence location".to_vec(),
+			None
+		));
+
+		// Test with account that doesn't have verified identity and it should fail with IdentityNotVerified error
+		assert_noop!(
+			AmbassadorGovernance::<Runtime>::submit_appeal(
+				signed_origin(account_without_identity),
+				b"Appeal decision hash".to_vec(),
+				b"Appeal justification with reference to off-chain evidence location".to_vec(),
+				None
+			),
+			crate::Error::<Runtime>::IdentityNotVerified
+		);
+
+		// Test another extrinsic with identity verification
+		assert_ok!(AmbassadorGovernance::<Runtime>::register_conflict_of_interest(
+			signed_origin(account_with_identity),
+			crate::ConflictType::Financial,
+			b"Conflict".to_vec(),
+			b"Related matter".to_vec(),
+			None
+		));
+
+		// Test the same extrinsic with account without identity and it should fail
+		assert_noop!(
+			AmbassadorGovernance::<Runtime>::register_conflict_of_interest(
+				signed_origin(account_without_identity),
+				crate::ConflictType::Financial,
+				b"Conflict".to_vec(),
+				b"Related matter".to_vec(),
+				None
+			),
+			crate::Error::<Runtime>::IdentityNotVerified
+		);
 	});
 }

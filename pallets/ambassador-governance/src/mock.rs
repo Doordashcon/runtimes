@@ -408,8 +408,12 @@ pub struct MockIdentityVerifier;
 
 impl crate::IdentityVerifier<AccountId> for MockIdentityVerifier {
 	fn has_identity(who: &AccountId) -> bool {
-		// For testing purposes, accounts 1, 2, and 3 have verified identities
-		*who == 1 || *who == 2 || *who == 3
+		// For testing purposes:
+		// - Accounts 1-10 have verified identities
+		// - Account 11 and above do NOT have verified identities
+		// This allows rank check tests to work properly (which use accounts 1-4)
+		// while still enabling identity verification tests (which use account 11)
+		*who >= 1 && *who <= 10
 	}
 }
 
