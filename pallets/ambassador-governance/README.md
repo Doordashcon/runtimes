@@ -27,6 +27,10 @@
 - [Ambassador Fellowship Governance Sequence Diagram](#ambassador-fellowship-governance-sequence-diagram)
 - [Secretary Collective Diagram](#secretary-collective-diagram)
 - [Decoupled Architecture Diagram](#decoupled-architecture-diagram)
+- [Ambassador Fellowship Vertical Structure](#ambassador-fellowship-vertical-structure)
+- [Decision Making System](#decision-making-system)
+- [Professional Services Boundaries](#professional-services-boundaries)
+- [Disciplinary Action Framework](#disciplinary-action-framework)
 
 ## Usage
 
@@ -776,6 +780,8 @@ classDiagram
     +form_appeal_committee(appeal_id, members)
     +decide_appeal(appeal_id, decision)
     +establish_integration(mechanism, target_collective, description, participants, agreement_hash)
+    +register_disciplinary_action(subject, level, reason, duration, evidence_hash)
+    +resolve_disciplinary_action(discipline_id, resolution_summary, evidence_hash)
   }
 
   class EmergencyDetails {
@@ -809,6 +815,17 @@ classDiagram
     +target_participants: BoundedVec~AccountId~
     +established_at: BlockNumber
     +agreement_hash: Option~Hash~
+  }
+
+  class DisciplineDetails {
+    +subject: AccountId
+    +issuer: AccountId
+    +level: DisciplineLevel
+    +reason: BoundedString
+    +issued_at: BlockNumber
+    +duration: Option~BlockNumber~
+    +evidence_hash: Option~Hash~
+    +active: bool
   }
 
   class EmergencyType {
@@ -849,14 +866,25 @@ classDiagram
     IntegratedPlanningCycles
   }
 
+  class DisciplineLevel {
+    <<enumeration>>
+    Notification
+    Warning
+    Probation
+    Suspension
+    Removal
+  }
+
   AmbassadorGovernance --> EmergencyDetails
   AmbassadorGovernance --> AppealDetails
   AmbassadorGovernance --> IntegrationDetails
+  AmbassadorGovernance --> DisciplineDetails
   EmergencyDetails --> EmergencyType
   EmergencyDetails --> EmergencySeverity
   AppealDetails --> AppealStatus
   AppealDetails --> AppealDecision
   IntegrationDetails --> IntegrationMechanism
+  DisciplineDetails --> DisciplineLevel
 ```
 
 ## Professional Services Boundaries
@@ -875,8 +903,8 @@ The Ambassador Fellowship Governance pallet includes a Professional Services Bou
 ```mermaid
 classDiagram
   class AmbassadorGovernance {
-    +register_service_provider(provider_account, provider_name, service_types, contact_info, evidence_hash)
-    +create_service_referral(provider_id, service_type, description, compensation_disclosed, compensation_details)
+    +set_service_provider(provider_account, provider_name, service_types, contact_info, evidence_hash)
+    +set_service_referral(provider_id, service_type, description, compensation_disclosed, compensation_details)
     +MinRankForProviderRegistry: u16
     +MinRankForReferral: u16
   }
@@ -937,18 +965,105 @@ sequenceDiagram
   participant SP as Service Provider
 
   %% Service Provider Registration Flow
-  A->>AG: register_service_provider(provider_account, ...)
+  A->>AG: set_service_provider(provider_account, ...)
   AG->>IP: has_identity(provider_account)
   IP-->>AG: true/false
   Note over AG: Verify ambassador has minimum required rank
   AG->>AG: Store provider details
-  AG-->>A: ServiceProviderRegistered event
+  AG-->>A: ServiceProviderSet event
 
   %% Service Referral Flow
-  A->>AG: create_service_referral(provider_id, ...)
+  A->>AG: set_service_referral(provider_id, ...)
   Note over AG: Verify ambassador has minimum required rank
   AG->>AG: Check provider exists
   AG->>AG: Validate compensation disclosure
   AG->>AG: Store referral details
-  AG-->>A: ServiceReferralCreated event
+  AG-->>A: ServiceReferralSet event
 ```
+
+## Disciplinary Action Framework
+
+The Ambassador Fellowship Governance pallet implements a Progressive Enforcement pattern through its Disciplinary Action Framework. This framework enables authorized members to register disciplinary actions against fellowship members who violate the code of conduct or fail to fulfill their responsibilities, and provides a structured path for resolving these actions.
+
+### Key Components
+
+- **Identity Verification**: All disciplinary actions require verified identity through the Identity pallet
+- **Rank-Based Access Control**: Only ambassadors with sufficient rank (`MinRankForDisciplinaryActionEnforcement`) can register or resolve disciplinary actions
+- **Progressive Enforcement**: Follows a graduated approach (notification → warning → action) with clear remediation paths
+- **Evidence Handling**: Follows the pallet's evidence handling pattern where evidence hashes are stored on-chain while actual evidence is stored off-chain
+- **Transparency**: All disciplinary actions emit events for transparency and accountability
+
+### Class Diagram
+
+```mermaid
+classDiagram
+  class AmbassadorGovernance {
+    +register_disciplinary_action(subject, level, reason, duration, evidence_hash)
+    +resolve_disciplinary_action(discipline_id, resolution_summary, evidence_hash)
+    +MinRankForDisciplinaryActionEnforcement: u16
+  }
+
+  class DisciplineDetails {
+    +subject: AccountId
+    +issuer: AccountId
+    +level: DisciplineLevel
+    +reason: BoundedString
+    +issued_at: BlockNumber
+    +duration: Option~BlockNumber~
+    +evidence_hash: Option~Hash~
+    +active: bool
+  }
+
+  class DisciplineLevel {
+    <<enumeration>>
+    Notification
+    Warning
+    Probation
+    Suspension
+    Removal
+  }
+
+  class IdentityVerifier {
+    <<interface>>
+    +has_identity(who: AccountId): bool
+  }
+
+  class RankChecker {
+    <<interface>>
+    +has_minimum_rank(who: AccountId, min_rank: u16): bool
+  }
+
+  AmbassadorGovernance --> DisciplineDetails
+  DisciplineDetails --> DisciplineLevel
+  AmbassadorGovernance ..> IdentityVerifier: uses
+  AmbassadorGovernance ..> RankChecker: uses
+```
+
+### Sequence Diagram
+
+```mermaid
+sequenceDiagram
+  participant A as Authorized Ambassador
+  participant AG as Ambassador Governance
+  participant IP as Identity Pallet
+  participant S as Subject Member
+
+  %% Disciplinary Action Registration Flow
+  A->>AG: register_disciplinary_action(subject, ...)
+  AG->>IP: has_identity(issuer)
+  IP-->>AG: true/false
+  Note over AG: Verify ambassador has minimum required rank
+  AG->>AG: Store disciplinary action details
+  AG-->>A: DisciplinaryActionRegistered event
+
+  %% Disciplinary Action Resolution Flow
+  A->>AG: resolve_disciplinary_action(discipline_id, ...)
+  AG->>IP: has_identity(resolver)
+  IP-->>AG: true/false
+  Note over AG: Verify ambassador has minimum required rank
+  AG->>AG: Check disciplinary action exists and is active
+  AG->>AG: Set disciplinary action to inactive
+  AG-->>A: DisciplinaryActionResolved event
+```
+
+This framework ensures that disciplinary actions follow due process, with clear paths for both enforcement and resolution, aligning with the Ambassador Fellowship Manifesto's governance patterns.

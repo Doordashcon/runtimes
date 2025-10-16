@@ -365,15 +365,38 @@ impl EnsureOrigin<RuntimeOrigin> for MockIntegrationOrigin {
 parameter_types! {
 	pub const MaxJustificationLength: u32 = 1000;
 	pub const MaxDescriptionLength: u32 = 1000;
-	pub const MaxCommitteeMembers: u32 = 5;
-	pub const MaxParticipants: u32 = 10;
-	pub const MinRankForProviderRegistry: u16 = 2; // Rank II
-	pub const MinRankForReferral: u16 = 2; // Rank II
+	pub const MaxResolutionLength: u32 = 1000;
+	pub const MaxRemarkContentLength: u32 = 1000;
+	pub const MaxEvidenceInfoLength: u32 = 1000;
+	pub const MaxAppealCommitteeMembers: u32 = 5;
+	pub const MaxEmergencyCommitteeMembers: u32 = 5;
+	pub const MaxConflictOfInterestChecks: u32 = 10;
+	pub const MaxSourceParticipants: u32 = 10;
+	pub const MaxTargetParticipants: u32 = 10;
+	pub const MaxServiceTypes: u32 = 10;
+	pub const MaxCompensationDetailsLength: u32 = 1000;
+	pub const MinRankForProviderRegistry: u16 = 2; // Rank II (Lead Ambassador)
+	pub const MinRankForReferral: u16 = 2; // Rank II (Lead Ambassador)
 	pub const MinRankToActivateEmergencyProtocol: u16 = 3; // Rank III (Senior Ambassador)
+	pub const MinRankToSetRemark: u16 = 1; // Rank I (Associate Ambassador)
 	pub const MinRankToFormEmergencyCommittee: u16 = 3; // Rank III (Senior Ambassador)
-	pub const MinRankToSubmitAppeal: u16 = 1; // Rank I (Junior Ambassador)
+	pub const MinRankToSubmitAppeal: u16 = 1; // Rank I (Associate Ambassador)
 	pub const MinRankToFormAppealCommittee: u16 = 3; // Rank III (Senior Ambassador)
-	pub const MinRankToEstablishIntegration: u16 = 2; // Rank II (Ambassador)
+	pub const MinRankToEstablishIntegration: u16 = 2; // Rank II (Lead Ambassador)
+	pub const MinRankForParticipationMetricMonitoring: u16 = 3; // Rank III+ accountable (Senior Ambassador+)
+	pub const MinRankForParameterAdjustmentTriggers: u16 = 4; // Rank IV+ accountable (Principal Ambassador+)
+	pub const MinRankForGovernanceParameterRegistry: u16 = 4; // Rank IV+ accountable (Principal Ambassador+)
+	pub const MinRankForEmergencyClassification: u16 = 3; // Rank III+ accountable (Senior Ambassador+)
+	pub const MinRankForEmergencyResponseAuthority: u16 = 4; // Rank IV+ accountable (Principal Ambassador+)
+	pub const MinRankForGovernanceParticipationRequirements: u16 = 3; // Rank III+ accountable (Senior Ambassador+)
+	pub const MinRankForDecideAppeal: u16 = 3; // Rank III+ accountable (Senior Ambassador+)
+	pub const MinRankForDisciplinaryActionEnforcement: u16 = 4; // Rank IV+ accountable (Principal Ambassador+)
+	pub const MinRankToSetConflictOfInterest: u16 = 0; // All ranks accountable (Advocate Ambassador+)
+	pub const MinRankForCoordinationMechanisms: u16 = 3; // Rank III+ accountable (Senior Ambassador+)
+	pub const MinRankForJointDecisionMaking: u16 = 4; // Rank IV+ accountable (Principal Ambassador+)
+	pub const MinRankForKnowledgeSharing: u16 = 3; // Rank III+ accountable (Senior Ambassador+)
+	pub const MinRankForBoundaryManagement: u16 = 4; // Rank IV+ accountable (Principal Ambassador+)
+	pub const MinRankForRoleFulfillmentContingency: u16 = 4; // Rank IV+ accountable (Principal Ambassador+)
 }
 
 impl pallet_ambassador_governance::Config for Runtime {
@@ -389,18 +412,42 @@ impl pallet_ambassador_governance::Config for Runtime {
 	type IntegrationOrigin = MockIntegrationOrigin;
 	type MaxJustificationLength = MaxJustificationLength;
 	type MaxDescriptionLength = MaxDescriptionLength;
-	type MaxCommitteeMembers = MaxCommitteeMembers;
-	type MaxParticipants = MaxParticipants;
+	type MaxResolutionLength = MaxResolutionLength;
+	type MaxRemarkContentLength = MaxRemarkContentLength;
+	type MaxEvidenceInfoLength = MaxEvidenceInfoLength;
+	type MaxAppealCommitteeMembers = MaxAppealCommitteeMembers;
+	type MaxEmergencyCommitteeMembers = MaxEmergencyCommitteeMembers;
+	type MaxConflictOfInterestChecks = MaxConflictOfInterestChecks;
+	type MaxSourceParticipants = MaxSourceParticipants;
+	type MaxTargetParticipants = MaxTargetParticipants;
+	type MaxServiceTypes = MaxServiceTypes;
+	type MaxCompensationDetailsLength = MaxCompensationDetailsLength;
 	type WeightInfo = ();
 	type IdentityRegistrar = MockIdentityVerifier;
 	type RankChecker = MockRankChecker;
 	type MinRankForProviderRegistry = MinRankForProviderRegistry;
 	type MinRankForReferral = MinRankForReferral;
 	type MinRankToActivateEmergencyProtocol = MinRankToActivateEmergencyProtocol;
+	type MinRankToSetRemark = MinRankToSetRemark;
 	type MinRankToFormEmergencyCommittee = MinRankToFormEmergencyCommittee;
 	type MinRankToSubmitAppeal = MinRankToSubmitAppeal;
 	type MinRankToFormAppealCommittee = MinRankToFormAppealCommittee;
 	type MinRankToEstablishIntegration = MinRankToEstablishIntegration;
+	type MinRankForParticipationMetricMonitoring = MinRankForParticipationMetricMonitoring;
+	type MinRankForParameterAdjustmentTriggers = MinRankForParameterAdjustmentTriggers;
+	type MinRankForGovernanceParameterRegistry = MinRankForGovernanceParameterRegistry;
+	type MinRankForEmergencyClassification = MinRankForEmergencyClassification;
+	type MinRankForEmergencyResponseAuthority = MinRankForEmergencyResponseAuthority;
+	type MinRankForGovernanceParticipationRequirements =
+		MinRankForGovernanceParticipationRequirements;
+	type MinRankForDecideAppeal = MinRankForDecideAppeal;
+	type MinRankForDisciplinaryActionEnforcement = MinRankForDisciplinaryActionEnforcement;
+	type MinRankToSetConflictOfInterest = MinRankToSetConflictOfInterest;
+	type MinRankForCoordinationMechanisms = MinRankForCoordinationMechanisms;
+	type MinRankForJointDecisionMaking = MinRankForJointDecisionMaking;
+	type MinRankForKnowledgeSharing = MinRankForKnowledgeSharing;
+	type MinRankForBoundaryManagement = MinRankForBoundaryManagement;
+	type MinRankForRoleFulfillmentContingency = MinRankForRoleFulfillmentContingency;
 }
 
 // Mock implementation of IdentityVerifier trait
@@ -409,11 +456,11 @@ pub struct MockIdentityVerifier;
 impl crate::IdentityVerifier<AccountId> for MockIdentityVerifier {
 	fn has_identity(who: &AccountId) -> bool {
 		// For testing purposes:
-		// - Accounts 1-10 have verified identities
+		// - Accounts 0-10 have verified identities
 		// - Account 11 and above do NOT have verified identities
 		// This allows rank check tests to work properly (which use accounts 1-4)
 		// while still enabling identity verification tests (which use account 11)
-		*who >= 1 && *who <= 10
+		*who >= 0 && *who <= 10
 	}
 }
 
@@ -423,15 +470,24 @@ pub struct MockRankChecker;
 impl crate::RankChecker<AccountId> for MockRankChecker {
 	fn has_minimum_rank(who: &AccountId, min_rank: u16) -> bool {
 		// For testing purposes:
-		// Account 1 has rank 3 (Senior Ambassador)
-		// Account 2 has rank 2 (Ambassador)
-		// Account 3 has rank 1 (Junior Ambassador)
-		// All other accounts have rank 0 (not ranked)
+		// Account 11 has high rank but no identity according to MockIdentityVerifier
+		// Account 6 has rank 6 (Global Head Ambassador)
+		// Account 5 has rank 5 (Global Ambassador)
+		// Account 4 has rank 4 (Principal Ambassador)
+		// Account 3 has rank 3 (Senior Ambassador)
+		// Account 2 has rank 2 (Lead Ambassador)
+		// Account 1 has rank 1 (Associate Ambassador)
+		// All other accounts have rank 0 (not ranked Advocate Ambassador)
 		match *who {
-			1 => min_rank <= 3,
+			11 => min_rank <= 11,
+			6 => min_rank <= 6,
+			5 => min_rank <= 5,
+			4 => min_rank <= 4,
+			3 => min_rank <= 3,
 			2 => min_rank <= 2,
-			3 => min_rank <= 1,
-			_ => min_rank == 0,
+			1 => min_rank <= 1,
+			0 => min_rank <= 0,
+			_ => min_rank == 12,
 		}
 	}
 }
@@ -440,7 +496,7 @@ impl crate::RankChecker<AccountId> for MockRankChecker {
 pub fn new_test_ext() -> sp_io::TestExternalities {
 	let mut t = frame_system::GenesisConfig::<Runtime>::default().build_storage().unwrap();
 
-	let balances = vec![(1, 100), (2, 100), (3, 100), (4, 100), (5, 100)];
+	let balances = vec![(1, 100), (2, 100), (3, 100), (4, 100), (5, 100), (6, 100)];
 	let mut ext = sp_io::TestExternalities::new(t);
 	ext.execute_with(|| {
 		frame_system::Pallet::<Runtime>::set_block_number(1);

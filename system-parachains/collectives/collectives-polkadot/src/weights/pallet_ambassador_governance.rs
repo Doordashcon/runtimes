@@ -55,7 +55,7 @@ impl<T: frame_system::Config> pallet_ambassador_governance::WeightInfo for Weigh
             .saturating_add(T::DbWeight::get().reads(2))
             .saturating_add(T::DbWeight::get().writes(2))
     }
-    
+
     // Storage: AmbassadorGovernance Emergencies (r:1 w:1)
     // Storage: AmbassadorGovernance EmergencyCommittees (r:1 w:1)
     fn form_emergency_committee() -> Weight {
@@ -63,14 +63,14 @@ impl<T: frame_system::Config> pallet_ambassador_governance::WeightInfo for Weigh
             .saturating_add(T::DbWeight::get().reads(2))
             .saturating_add(T::DbWeight::get().writes(2))
     }
-    
+
     // Storage: AmbassadorGovernance Emergencies (r:1 w:1)
     fn resolve_emergency() -> Weight {
         Weight::from_parts(25_000_000, 0)
             .saturating_add(T::DbWeight::get().reads(1))
             .saturating_add(T::DbWeight::get().writes(1))
     }
-    
+
     // Storage: AmbassadorGovernance Appeals (r:1 w:1)
     // Storage: AmbassadorGovernance AppealCount (r:1 w:1)
     fn submit_appeal() -> Weight {
@@ -78,7 +78,7 @@ impl<T: frame_system::Config> pallet_ambassador_governance::WeightInfo for Weigh
             .saturating_add(T::DbWeight::get().reads(2))
             .saturating_add(T::DbWeight::get().writes(2))
     }
-    
+
     // Storage: AmbassadorGovernance Appeals (r:1 w:1)
     // Storage: AmbassadorGovernance AppealCommittees (r:1 w:1)
     fn form_appeal_committee() -> Weight {
@@ -86,14 +86,14 @@ impl<T: frame_system::Config> pallet_ambassador_governance::WeightInfo for Weigh
             .saturating_add(T::DbWeight::get().reads(2))
             .saturating_add(T::DbWeight::get().writes(2))
     }
-    
+
     // Storage: AmbassadorGovernance Appeals (r:1 w:1)
     fn decide_appeal() -> Weight {
         Weight::from_parts(25_000_000, 0)
             .saturating_add(T::DbWeight::get().reads(1))
             .saturating_add(T::DbWeight::get().writes(1))
     }
-    
+
     // Storage: AmbassadorGovernance Integrations (r:1 w:1)
     // Storage: AmbassadorGovernance IntegrationCount (r:1 w:1)
     fn establish_integration() -> Weight {
@@ -101,57 +101,57 @@ impl<T: frame_system::Config> pallet_ambassador_governance::WeightInfo for Weigh
             .saturating_add(T::DbWeight::get().reads(2))
             .saturating_add(T::DbWeight::get().writes(2))
     }
-    
+
     // Storage: AmbassadorGovernance DisciplinaryActions (r:1 w:1)
     // Storage: AmbassadorGovernance DisciplinaryActionCount (r:1 w:1)
-    fn initiate_disciplinary_action() -> Weight {
+    fn register_disciplinary_action() -> Weight {
         Weight::from_parts(25_000_000, 0)
             .saturating_add(T::DbWeight::get().reads(2))
             .saturating_add(T::DbWeight::get().writes(2))
     }
-    
+
     // Storage: AmbassadorGovernance RankTransitions (r:1 w:1)
     // Storage: AmbassadorGovernance RankTransitionCount (r:1 w:1)
-    fn initiate_rank_transition() -> Weight {
+    fn register_rank_transition() -> Weight {
         Weight::from_parts(25_000_000, 0)
             .saturating_add(T::DbWeight::get().reads(2))
             .saturating_add(T::DbWeight::get().writes(2))
     }
-    
+
     // Storage: AmbassadorGovernance ConflictsOfInterest (r:1 w:1)
     // Storage: AmbassadorGovernance ConflictOfInterestCount (r:1 w:1)
-    fn register_conflict_of_interest() -> Weight {
+    fn set_conflict_of_interest() -> Weight {
         Weight::from_parts(25_000_000, 0)
             .saturating_add(T::DbWeight::get().reads(2))
             .saturating_add(T::DbWeight::get().writes(2))
     }
-    
+
     // Storage: AmbassadorGovernance Remarks (r:1 w:1)
-    // Storage: AmbassadorGovernance RemarkCount (r:1 w:1)
-    fn create_remark() -> Weight {
+    // Storage: AmbassadorGovernance RemarkNonces (r:1 w:1)
+    fn set_remark() -> Weight {
         Weight::from_parts(20_000_000, 0)
             .saturating_add(T::DbWeight::get().reads(2))
             .saturating_add(T::DbWeight::get().writes(2))
     }
-    
+
     // Storage: AmbassadorGovernance HealthMetrics (r:1 w:1)
-    fn update_governance_health_metrics() -> Weight {
+    fn set_governance_health_metrics() -> Weight {
         Weight::from_parts(15_000_000, 0)
             .saturating_add(T::DbWeight::get().reads(1))
             .saturating_add(T::DbWeight::get().writes(1))
     }
-    
+
     // Storage: AmbassadorGovernance ServiceProviders (r:1 w:1)
     // Storage: AmbassadorGovernance ServiceProviderCount (r:1 w:1)
-    fn register_service_provider() -> Weight {
+    fn set_service_provider() -> Weight {
         Weight::from_parts(25_000_000, 0)
             .saturating_add(T::DbWeight::get().reads(2))
             .saturating_add(T::DbWeight::get().writes(2))
     }
-    
+
     // Storage: AmbassadorGovernance ServiceReferrals (r:1 w:1)
     // Storage: AmbassadorGovernance ServiceReferralCount (r:1 w:1)
-    fn create_service_referral() -> Weight {
+    fn set_service_referral() -> Weight {
         Weight::from_parts(25_000_000, 0)
             .saturating_add(T::DbWeight::get().reads(2))
             .saturating_add(T::DbWeight::get().writes(2))

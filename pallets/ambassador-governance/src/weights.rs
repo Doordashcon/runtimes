@@ -58,13 +58,14 @@ pub trait WeightInfo {
 	fn form_appeal_committee() -> Weight;
 	fn decide_appeal() -> Weight;
 	fn establish_integration() -> Weight;
-	fn register_service_provider() -> Weight;
-	fn create_service_referral() -> Weight;
-	fn initiate_disciplinary_action() -> Weight;
-	fn initiate_rank_transition() -> Weight;
-	fn register_conflict_of_interest() -> Weight;
-	fn create_remark() -> Weight;
-	fn update_governance_health_metrics() -> Weight;
+	fn set_service_provider() -> Weight;
+	fn set_service_referral() -> Weight;
+	fn register_disciplinary_action() -> Weight;
+	fn resolve_disciplinary_action() -> Weight;
+	fn register_rank_transition() -> Weight;
+	fn set_conflict_of_interest() -> Weight;
+	fn set_remark() -> Weight;
+	fn set_governance_health_metrics() -> Weight;
 }
 
 /// Weights for `pallet_ambassador_governance` using the Substrate node and recommended hardware.
@@ -115,13 +116,15 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	/// Proof: `AmbassadorGovernance::Appeals` (`max_values`: None, `max_size`: Some(20129), added: 22604, mode: `MaxEncodedLen`)
 	/// Storage: `AmbassadorGovernance::AppealCommittees` (r:0 w:1)
 	/// Proof: `AmbassadorGovernance::AppealCommittees` (`max_values`: None, `max_size`: Some(369), added: 2844, mode: `MaxEncodedLen`)
+	/// Storage: `AmbassadorGovernance::Conflicts` (r:1 w:0)
+	/// Proof: `AmbassadorGovernance::Conflicts` (`max_values`: None, `max_size`: Some(20095), added: 22570, mode: `MaxEncodedLen`)
 	fn form_appeal_committee() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `327`
 		//  Estimated: `23594`
-		// Minimum execution time: 12_000_000 picoseconds.
-		Weight::from_parts(13_000_000, 23594)
-			.saturating_add(T::DbWeight::get().reads(1_u64))
+		// Minimum execution time: 15_000_000 picoseconds.
+		Weight::from_parts(16_000_000, 23594)
+			.saturating_add(T::DbWeight::get().reads(2_u64))
 			.saturating_add(T::DbWeight::get().writes(2_u64))
 	}
 	/// Storage: `AmbassadorGovernance::Appeals` (r:1 w:1)
@@ -147,7 +150,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	}
 	/// Storage: `AmbassadorGovernance::ServiceProviders` (r:0 w:1)
 	/// Proof: `AmbassadorGovernance::ServiceProviders` (`max_values`: None, `max_size`: Some(20131), added: 22606, mode: `MaxEncodedLen`)
-	fn register_service_provider() -> Weight {
+	fn set_service_provider() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -157,7 +160,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	}
 	/// Storage: `AmbassadorGovernance::ServiceReferrals` (r:0 w:1)
 	/// Proof: `AmbassadorGovernance::ServiceReferrals` (`max_values`: None, `max_size`: Some(30093), added: 32568, mode: `MaxEncodedLen`)
-	fn create_service_referral() -> Weight {
+	fn set_service_referral() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -165,14 +168,23 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		Weight::from_parts(6_000_000, 0)
 			.saturating_add(T::DbWeight::get().writes(1_u64))
 	}
-	fn initiate_disciplinary_action() -> Weight {
+	fn register_disciplinary_action() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
 		// Minimum execution time: 3_000_000 picoseconds.
 		Weight::from_parts(4_000_000, 0)
 	}
-	fn initiate_rank_transition() -> Weight {
+	fn resolve_disciplinary_action() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 5_000_000 picoseconds.
+		Weight::from_parts(6_000_000, 0)
+			.saturating_add(T::DbWeight::get().reads(1_u64))
+			.saturating_add(T::DbWeight::get().writes(1_u64))
+	}
+	fn register_rank_transition() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -181,7 +193,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	}
 	/// Storage: `AmbassadorGovernance::Conflicts` (r:0 w:1)
 	/// Proof: `AmbassadorGovernance::Conflicts` (`max_values`: None, `max_size`: Some(20095), added: 22570, mode: `MaxEncodedLen`)
-	fn register_conflict_of_interest() -> Weight {
+	fn set_conflict_of_interest() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -191,7 +203,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	}
 	/// Storage: `AmbassadorGovernance::Remarks` (r:0 w:1)
 	/// Proof: `AmbassadorGovernance::Remarks` (`max_values`: None, `max_size`: Some(20122), added: 22597, mode: `MaxEncodedLen`)
-	fn create_remark() -> Weight {
+	fn set_remark() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -201,7 +213,7 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 	}
 	/// Storage: `AmbassadorGovernance::GovernanceHealth` (r:0 w:1)
 	/// Proof: `AmbassadorGovernance::GovernanceHealth` (`max_values`: Some(1), `max_size`: Some(10), added: 505, mode: `MaxEncodedLen`)
-	fn update_governance_health_metrics() -> Weight {
+	fn set_governance_health_metrics() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -258,13 +270,15 @@ impl WeightInfo for () {
 	/// Proof: `AmbassadorGovernance::Appeals` (`max_values`: None, `max_size`: Some(20129), added: 22604, mode: `MaxEncodedLen`)
 	/// Storage: `AmbassadorGovernance::AppealCommittees` (r:0 w:1)
 	/// Proof: `AmbassadorGovernance::AppealCommittees` (`max_values`: None, `max_size`: Some(369), added: 2844, mode: `MaxEncodedLen`)
+	/// Storage: `AmbassadorGovernance::Conflicts` (r:1 w:0)
+	/// Proof: `AmbassadorGovernance::Conflicts` (`max_values`: None, `max_size`: Some(20095), added: 22570, mode: `MaxEncodedLen`)
 	fn form_appeal_committee() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `327`
 		//  Estimated: `23594`
-		// Minimum execution time: 12_000_000 picoseconds.
-		Weight::from_parts(13_000_000, 23594)
-			.saturating_add(RocksDbWeight::get().reads(1_u64))
+		// Minimum execution time: 15_000_000 picoseconds.
+		Weight::from_parts(16_000_000, 23594)
+			.saturating_add(RocksDbWeight::get().reads(2_u64))
 			.saturating_add(RocksDbWeight::get().writes(2_u64))
 	}
 	/// Storage: `AmbassadorGovernance::Appeals` (r:1 w:1)
@@ -290,7 +304,7 @@ impl WeightInfo for () {
 	}
 	/// Storage: `AmbassadorGovernance::ServiceProviders` (r:0 w:1)
 	/// Proof: `AmbassadorGovernance::ServiceProviders` (`max_values`: None, `max_size`: Some(20131), added: 22606, mode: `MaxEncodedLen`)
-	fn register_service_provider() -> Weight {
+	fn set_service_provider() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -300,7 +314,7 @@ impl WeightInfo for () {
 	}
 	/// Storage: `AmbassadorGovernance::ServiceReferrals` (r:0 w:1)
 	/// Proof: `AmbassadorGovernance::ServiceReferrals` (`max_values`: None, `max_size`: Some(30093), added: 32568, mode: `MaxEncodedLen`)
-	fn create_service_referral() -> Weight {
+	fn set_service_referral() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -308,14 +322,23 @@ impl WeightInfo for () {
 		Weight::from_parts(6_000_000, 0)
 			.saturating_add(RocksDbWeight::get().writes(1_u64))
 	}
-	fn initiate_disciplinary_action() -> Weight {
+	fn register_disciplinary_action() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
 		// Minimum execution time: 3_000_000 picoseconds.
 		Weight::from_parts(4_000_000, 0)
 	}
-	fn initiate_rank_transition() -> Weight {
+	fn resolve_disciplinary_action() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `0`
+		// Minimum execution time: 5_000_000 picoseconds.
+		Weight::from_parts(6_000_000, 0)
+			.saturating_add(RocksDbWeight::get().reads(1_u64))
+			.saturating_add(RocksDbWeight::get().writes(1_u64))
+	}
+	fn register_rank_transition() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -324,7 +347,7 @@ impl WeightInfo for () {
 	}
 	/// Storage: `AmbassadorGovernance::Conflicts` (r:0 w:1)
 	/// Proof: `AmbassadorGovernance::Conflicts` (`max_values`: None, `max_size`: Some(20095), added: 22570, mode: `MaxEncodedLen`)
-	fn register_conflict_of_interest() -> Weight {
+	fn set_conflict_of_interest() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -334,7 +357,7 @@ impl WeightInfo for () {
 	}
 	/// Storage: `AmbassadorGovernance::Remarks` (r:0 w:1)
 	/// Proof: `AmbassadorGovernance::Remarks` (`max_values`: None, `max_size`: Some(20122), added: 22597, mode: `MaxEncodedLen`)
-	fn create_remark() -> Weight {
+	fn set_remark() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
@@ -344,7 +367,7 @@ impl WeightInfo for () {
 	}
 	/// Storage: `AmbassadorGovernance::GovernanceHealth` (r:0 w:1)
 	/// Proof: `AmbassadorGovernance::GovernanceHealth` (`max_values`: Some(1), `max_size`: Some(10), added: 505, mode: `MaxEncodedLen`)
-	fn update_governance_health_metrics() -> Weight {
+	fn set_governance_health_metrics() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`

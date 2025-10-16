@@ -45,7 +45,7 @@ use pallet_ranked_collective_ambassador::Rank;
 use scale_info::TypeInfo;
 use sp_core::H256;
 use sp_runtime::{
-	traits::{Hash, SaturatedConversion},
+	traits::{AtLeast32BitUnsigned, Hash, SaturatedConversion},
 	RuntimeDebug,
 };
 use sp_std::prelude::*;
@@ -317,7 +317,7 @@ pub struct EmergencyDetails<AccountId, BlockNumber, BoundedString> {
 	/// Block when emergency was resolved (if resolved)
 	resolved_at: Option<BlockNumber>,
 	/// Evidence hash
-	evidence: Option<H256>,
+	evidence_hash: Option<H256>,
 	/// Abuse detected after investigation or not
 	abuse_detected: bool,
 }
@@ -340,7 +340,7 @@ pub struct AppealDetails<AccountId, BlockNumber, BoundedString> {
 	/// Block when decision was made (if decided)
 	decided_at: Option<BlockNumber>,
 	/// Evidence hash
-	evidence: Option<H256>,
+	evidence_hash: Option<H256>,
 }
 
 /// Cross-collective integration details
@@ -358,7 +358,7 @@ pub struct AppealDetails<AccountId, BlockNumber, BoundedString> {
 	MaxEncodedLen,
 	frame_support::__private::codec::DecodeWithMemTracking,
 )]
-pub struct IntegrationDetails<BlockNumber, BoundedString, BoundedVecT> {
+pub struct IntegrationDetails<BlockNumber, BoundedString, BoundedVecS, BoundedVecT> {
 	/// Integration mechanism
 	mechanism: IntegrationMechanism,
 	/// Collective being integrated with
@@ -366,13 +366,13 @@ pub struct IntegrationDetails<BlockNumber, BoundedString, BoundedVecT> {
 	/// Integration description
 	description: BoundedString,
 	/// Participants from Ambassador Fellowship
-	ambassador_participants: BoundedVecT,
+	ambassador_participants: BoundedVecS,
 	/// Participants from target collective
 	target_participants: BoundedVecT,
 	/// Block when integration was established
 	established_at: BlockNumber,
-	/// Integration agreement hash
-	agreement_hash: Option<H256>,
+	/// Integration evidence hash
+	evidence_hash: Option<H256>,
 }
 
 /// Progressive discipline level
@@ -433,20 +433,27 @@ pub enum DisciplineLevel {
 	frame_support::__private::codec::DecodeWithMemTracking,
 )]
 pub enum TransitionType {
-	/// Voluntary exit from the fellowship
-	VoluntaryExit,
-	/// Promotion to a higher rank
-	///
-	/// Member advances to a higher rank within the Ambassador Fellowship hierarchy.
-	Promotion,
 	/// Demotion to a lower rank
 	///
 	/// Member moves to a lower rank within the Ambassador Fellowship hierarchy.
 	Demotion,
+	/// Promotion to a higher rank
+	///
+	/// Member advances to a higher rank within the Ambassador Fellowship hierarchy.
+	Promotion,
+	/// Removal from collective
+	///
+	/// Final step for the most severe violations or continued failure to meet obligations.
+	/// Permanently removes member from the collective.
+	Removal,
 	/// Role change within same rank
 	///
 	/// Member changes responsibilities while maintaining the same rank.
 	RoleChange,
+	/// Resignation
+	Resignation,
+	/// Retirement
+	Retirement,
 	/// Temporary absence
 	///
 	/// Member takes a temporary leave of absence with intent to return.
@@ -468,26 +475,46 @@ pub enum TransitionType {
 	frame_support::__private::codec::DecodeWithMemTracking,
 )]
 pub enum ConflictType {
-	/// Financial interest in outcome
+	/// Financial interest in outcome (Critical)
 	///
 	/// Member has a financial stake in the outcome of a decision.
-	Financial,
-	/// Personal relationship with involved parties
-	///
-	/// Member has a personal relationship with individuals affected by a decision.
-	Personal,
-	/// Professional relationship with involved parties
+	/// This is considered a critical conflict for committee participation.
+	FinancialCritical,
+	/// Professional relationship with involved parties (Critical)
 	///
 	/// Member has a professional relationship with individuals or organizations affected by a decision.
-	Professional,
-	/// Ideological bias
+	/// This is considered a critical conflict for committee participation.
+	ProfessionalCritical,
+	/// Personal relationship with involved parties (Non-critical)
+	///
+	/// Member has a personal relationship with individuals affected by a decision.
+	/// This is considered a non-critical conflict for committee participation.
+	PersonalNonCritical,
+	/// Ideological bias (Non-critical)
 	///
 	/// Member has strong ideological views that may affect their objectivity.
-	Ideological,
-	/// Other conflict type
+	/// This is considered a non-critical conflict for committee participation.
+	IdeologicalNonCritical,
+	/// Other conflict type (Non-critical)
 	///
 	/// Catch-all for conflicts that don't fit the predefined categories.
-	Other,
+	/// This is considered a non-critical conflict for committee participation.
+	OtherNonCritical,
+}
+
+/// Helper trait to determine if a conflict type is critical
+pub trait IsConflictCritical {
+	/// Returns true if the conflict type is considered critical for committee participation
+	fn is_critical(&self) -> bool;
+}
+
+impl IsConflictCritical for ConflictType {
+	fn is_critical(&self) -> bool {
+		match self {
+			ConflictType::FinancialCritical | ConflictType::ProfessionalCritical => true,
+			_ => false,
+		}
+	}
 }
 
 /// On-chain remark category
@@ -552,7 +579,7 @@ pub struct DisciplineDetails<AccountId, BlockNumber, BoundedString> {
 	/// Optional hash of evidence supporting the disciplinary action
 	/// where the actual evidence is stored off-chain, and its location should be
 	/// referenced in the reason field
-	pub evidence: Option<H256>,
+	pub evidence_hash: Option<H256>,
 	/// Whether the disciplinary action is active
 	pub active: bool,
 }
@@ -581,30 +608,44 @@ pub struct TransitionDetails<AccountId, BlockNumber, BoundedString> {
 	pub successor: Option<AccountId>,
 	/// Knowledge transfer status
 	pub knowledge_transfer_complete: bool,
+	/// Optional hash of evidence supporting the transition
+	/// where the actual evidence is stored off-chain, and its location should be
+	/// referenced in the justification field
+	pub evidence_hash: Option<H256>,
 }
 
 /// Conflict of interest registration
 ///
 /// Stores information about declared conflicts of interest.
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct ConflictRegistration<AccountId, BlockNumber, BoundedString> {
+pub struct ConflictRegistration<
+	AccountId,
+	ConflictType,
+	BlockNumber,
+	BoundedDescription,
+	BoundedRelatesTo,
+> {
 	/// Member declaring the conflict
 	pub member: AccountId,
 	/// Type of conflict
 	pub conflict_type: ConflictType,
 	/// Description of the conflict, must include the location
 	/// where any off-chain evidence is stored for future reference
-	pub description: BoundedString,
+	pub description: BoundedDescription,
 	/// Related matter or decision that can be an extrinsic hash, emergency ID, appeal ID, or any other
 	/// on-chain identifier that this conflict relates to. If the conflict is general,
 	/// this should contain a clear description of the scope of the conflict.
-	pub related_matter: BoundedString,
+	pub relates_to: Option<BoundedRelatesTo>,
 	/// Block when conflict was registered
-	pub registered_at: BlockNumber,
+	pub start_block: Option<BlockNumber>,
 	/// Block when conflict expires (if applicable)
-	pub expires_at: Option<BlockNumber>,
-	/// Whether the conflict is still active
-	pub active: bool,
+	pub end_block: Option<BlockNumber>,
+	/// Optional hash of evidence supporting the conflict declaration
+	/// where the actual evidence is stored off-chain, and its location should be
+	/// referenced in the description field
+	pub evidence_hash: Option<H256>,
+	/// Last block when conflict was updated
+	pub last_updated: BlockNumber,
 }
 
 /// On-chain remark
@@ -612,21 +653,15 @@ pub struct ConflictRegistration<AccountId, BlockNumber, BoundedString> {
 /// Stores standardized on-chain remarks with metadata.
 /// Unlike System::remark, this provides a structured format with additional metadata.
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct OnChainRemark<AccountId, BlockNumber, BoundedString> {
-	/// Author of the remark
-	pub author: AccountId,
-	/// Category of the remark
-	pub category: RemarkCategory,
-	/// Unique identifier for the remark
-	pub unique_id: BoundedString,
+pub struct OnChainRemark<BlockNumber, ContentBound> {
 	/// Content of the remark must include the location where any off-chain evidence
-	/// (referenced by the `related_hash`) is stored for future reference and auditability
-	pub content: BoundedString,
-	/// Block when remark was created
-	pub created_at: BlockNumber,
-	/// Related hash (if applicable) where actual evidence is stored off-chain and its location should be
+	/// (referenced by the `evidence_hash`) is stored for future reference and auditability
+	pub content: ContentBound,
+	/// Evidence hash (if applicable) where actual evidence is stored off-chain and its location should be
 	/// referenced in the `content` field
-	pub related_hash: Option<H256>,
+	pub evidence_hash: Option<H256>,
+	/// Block when remark was last updated
+	pub last_updated: BlockNumber,
 }
 
 /// Professional service type
@@ -660,50 +695,65 @@ pub enum ProfessionalServiceType {
 
 /// Professional service provider details
 ///
-/// Stores information about registered professional service providers.
+/// Stores minimal information about registered professional service providers.
 /// Providers must have a verified identity through the identity pallet.
+/// Most provider information is stored in their on-chain identity.
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct ServiceProviderDetails<AccountId, BlockNumber, BoundedString> {
+pub struct ServiceProviderDetails<
+	AccountId,
+	BlockNumber,
+	ServiceTypesBoundedVec,
+	EvidenceInfoBoundedString,
+> {
 	/// Provider account with verified identity
 	provider_account: AccountId,
-	/// Provider name (specific to this service offering, may differ from identity name)
-	provider_name: BoundedString,
-	/// Service-specific contact information (should not duplicate information already in on-chain identity)
-	contact_info: BoundedString,
 	/// Service types offered
-	service_types: BoundedVec<ProfessionalServiceType, ConstU32<10>>,
-	/// Registrant (who registered this provider)
-	registrant: AccountId,
-	/// Registration date
-	registered_at: BlockNumber,
+	service_types: ServiceTypesBoundedVec,
+	/// Evidence information (references to off-chain evidence supporting the provider's credentials)
+	evidence_info: EvidenceInfoBoundedString,
+	/// Optional hash of evidence supporting the provider's credentials
+	/// where the actual evidence is stored off-chain, and its location should be
+	/// referenced in the evidence_info field
+	evidence_hash: Option<H256>,
+	/// Last updated block
+	last_updated: BlockNumber,
 }
 
 /// Professional service referral
 ///
 /// Stores information about referrals to professional service providers.
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct ServiceReferral<AccountId, BlockNumber, BoundedString> {
+pub struct ServiceReferral<
+	AccountId,
+	BlockNumber,
+	ServiceTypesBoundedVec,
+	DescriptionBoundedString,
+	CompensationDetailsBoundedString,
+	H256,
+> {
 	/// Referrer (Ambassador who made the referral)
 	referrer: AccountId,
-	/// Service provider being referred to
-	provider_id: BoundedString,
-	/// Service type being referred
-	service_type: ProfessionalServiceType,
-	/// Referral description
-	description: BoundedString,
-	/// Referral date
-	referred_at: BlockNumber,
-	/// Whether the referrer is receiving compensation for this referral (transparency requirement)
+	/// Provider being referred to (account with verified identity)
+	provider_account: AccountId,
+	/// Type of service being referred
+	service_types: ServiceTypesBoundedVec,
+	/// Description of the referral
+	description: DescriptionBoundedString,
+	/// Whether the referrer disclosed receiving compensation for this referral (transparency requirement)
 	compensation_disclosed: bool,
 	/// Description of compensation received by referrer for this referral (if any)
-	compensation_details: Option<BoundedString>,
+	compensation_details: Option<CompensationDetailsBoundedString>,
+	/// Optional hash of evidence supporting the referral
+	evidence_hash: Option<H256>,
+	/// When the referral was last updated
+	last_updated: BlockNumber,
 }
 
 /// Governance health metrics
 ///
 /// Stores metrics for monitoring governance health.
 #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
-pub struct GovernanceHealthMetrics<BlockNumber> {
+pub struct GovernanceHealthMetrics<BlockNumber, EvidenceInfoBound> {
 	/// Participation rate (0-100%)
 	/// Percentage of eligible members who participated in governance activities
 	pub participation_rate: u8,
@@ -714,6 +764,17 @@ pub struct GovernanceHealthMetrics<BlockNumber> {
 	pub vote_concentration: u8,
 	/// Average response time taken to respond to governance actions in blocks
 	pub avg_response_time: BlockNumber,
+	/// Start period
+	/// Block number at which the metrics period started
+	pub start_block: BlockNumber,
+	/// End period
+	/// Block number at which the metrics period ended
+	pub end_block: BlockNumber,
+	/// Evidence information, must include the location
+	/// where any off-chain evidence is stored for future reference and auditability
+	pub evidence_info: EvidenceInfoBound,
+	/// Optional evidence hash
+	pub evidence_hash: Option<H256>,
 	/// Last updated block
 	pub last_updated: BlockNumber,
 }
@@ -734,7 +795,8 @@ pub mod pallet {
 		type Currency: ReservableCurrency<Self::AccountId>;
 
 		/// Block number type
-		type BlockNumber: Parameter + Member + Copy + Default + MaxEncodedLen + TypeInfo + From<u32>;
+		type BlockNumber: Parameter + Member + Copy + Default + MaxEncodedLen + TypeInfo + AtLeast32BitUnsigned + PartialOrd + sp_runtime::traits::Bounded +
+    From<u32> + From<u64> + From<<<<Self as frame_system::Config>::Block as sp_runtime::traits::Block>::Header as sp_runtime::traits::Header>::Number>;
 
 		/// Origin authorized to activate emergency protocol
 		type EmergencyOrigin: EnsureOrigin<Self::RuntimeOrigin>;
@@ -765,13 +827,41 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxDescriptionLength: Get<u32>;
 
-		/// Maximum number of committee members
+		/// Maximum size for resolution strings
 		#[pallet::constant]
-		type MaxCommitteeMembers: Get<u32>;
+		type MaxResolutionLength: Get<u32>;
 
-		/// Maximum number of participants in integration
+		/// Maximum size for remark content strings
 		#[pallet::constant]
-		type MaxParticipants: Get<u32>;
+		type MaxRemarkContentLength: Get<u32>;
+
+		/// Maximum number of appeal committee members
+		#[pallet::constant]
+		type MaxAppealCommitteeMembers: Get<u32>;
+
+		/// Maximum number of emergency committee members
+		#[pallet::constant]
+		type MaxEmergencyCommitteeMembers: Get<u32>;
+
+		/// Maximum number of source collective (Ambassador Fellowship) participants in integration
+		#[pallet::constant]
+		type MaxSourceParticipants: Get<u32>;
+
+		/// Maximum number of target collective participants in integration
+		#[pallet::constant]
+		type MaxTargetParticipants: Get<u32>;
+
+		/// Maximum number of service types
+		#[pallet::constant]
+		type MaxServiceTypes: Get<u32>;
+
+		/// Maximum size for compensation details strings
+		#[pallet::constant]
+		type MaxCompensationDetailsLength: Get<u32>;
+
+		/// Maximum size for evidence information strings
+		#[pallet::constant]
+		type MaxEvidenceInfoLength: Get<u32>;
 
 		/// Weight information for extrinsics in this pallet
 		type WeightInfo: weights::WeightInfo;
@@ -810,6 +900,71 @@ pub mod pallet {
 		/// Minimum rank required to establish integration
 		#[pallet::constant]
 		type MinRankToEstablishIntegration: Get<u16>;
+
+		/// Minimum rank accountable for participation metric monitoring
+		#[pallet::constant]
+		type MinRankForParticipationMetricMonitoring: Get<u16>;
+
+		/// Minimum rank accountable for parameter adjustment triggers
+		#[pallet::constant]
+		type MinRankForParameterAdjustmentTriggers: Get<u16>;
+
+		/// Minimum rank accountable for governance parameter registry
+		#[pallet::constant]
+		type MinRankForGovernanceParameterRegistry: Get<u16>;
+
+		/// Minimum rank accountable for emergency classification
+		#[pallet::constant]
+		type MinRankForEmergencyClassification: Get<u16>;
+
+		/// Minimum rank accountable for emergency response authority
+		#[pallet::constant]
+		type MinRankForEmergencyResponseAuthority: Get<u16>;
+
+		/// Minimum rank accountable for governance participation requirements
+		#[pallet::constant]
+		type MinRankForGovernanceParticipationRequirements: Get<u16>;
+
+		/// Minimum rank accountable for decide appeal
+		#[pallet::constant]
+		type MinRankForDecideAppeal: Get<u16>;
+
+		/// Minimum rank accountable for disciplinary action enforcement
+		#[pallet::constant]
+		type MinRankForDisciplinaryActionEnforcement: Get<u16>;
+
+		/// Minimum rank accountable for transparency and fairness safeguards
+		#[pallet::constant]
+		type MinRankToSetConflictOfInterest: Get<u16>;
+
+		/// Minimum rank accountable for cross-collective coordination mechanisms
+		#[pallet::constant]
+		type MinRankForCoordinationMechanisms: Get<u16>;
+
+		/// Minimum rank accountable for joint decision-making procedures
+		#[pallet::constant]
+		type MinRankForJointDecisionMaking: Get<u16>;
+
+		/// Minimum rank accountable for knowledge and resource sharing
+		#[pallet::constant]
+		type MinRankForKnowledgeSharing: Get<u16>;
+
+		/// Minimum rank accountable for collective boundary management
+		#[pallet::constant]
+		type MinRankForBoundaryManagement: Get<u16>;
+
+		/// Minimum rank accountable for role fulfillment contingency
+		#[pallet::constant]
+		type MinRankForRoleFulfillmentContingency: Get<u16>;
+
+		/// Minimum rank required to set remarks
+		#[pallet::constant]
+		type MinRankToSetRemark: Get<u16>;
+
+		/// Maximum number of conflicts of interest to check per committee formation
+		/// This limits the computational complexity of conflict of interest checks
+		#[pallet::constant]
+		type MaxConflictOfInterestChecks: Get<u32>;
 	}
 
 	/// Emergency responses that have been declared
@@ -829,7 +984,7 @@ pub mod pallet {
 		_,
 		Blake2_128Concat,
 		T::Hash, // Emergency ID
-		BoundedVec<(T::AccountId, EmergencyRole), T::MaxCommitteeMembers>,
+		BoundedVec<(T::AccountId, EmergencyRole), T::MaxEmergencyCommitteeMembers>,
 	>;
 
 	/// Appeals that have been submitted
@@ -849,7 +1004,7 @@ pub mod pallet {
 		_,
 		Blake2_128Concat,
 		T::Hash, // Appeal ID
-		BoundedVec<T::AccountId, T::MaxCommitteeMembers>,
+		BoundedVec<T::AccountId, T::MaxAppealCommitteeMembers>,
 	>;
 
 	/// Cross-collective integrations that have been established
@@ -862,7 +1017,8 @@ pub mod pallet {
 		IntegrationDetails<
 			T::BlockNumber,
 			BoundedVec<u8, T::MaxDescriptionLength>,
-			BoundedVec<T::AccountId, T::MaxParticipants>,
+			BoundedVec<T::AccountId, T::MaxSourceParticipants>,
+			BoundedVec<T::AccountId, T::MaxTargetParticipants>,
 		>,
 	>;
 
@@ -892,12 +1048,25 @@ pub mod pallet {
 	pub type Conflicts<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
-		T::Hash, // Conflict ID
+		(T::AccountId, ConflictType, u32), // Composite key: (member, conflict_type, nonce)
 		ConflictRegistration<
 			T::AccountId,
+			ConflictType,
 			T::BlockNumber,
-			BoundedVec<u8, T::MaxJustificationLength>,
+			BoundedVec<u8, T::MaxDescriptionLength>,
+			BoundedVec<u8, T::MaxDescriptionLength>,
 		>,
+	>;
+
+	// Conflict of interest nonce tracker
+	#[pallet::storage]
+	#[pallet::getter(fn conflict_nonces)]
+	pub type ConflictNonces<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		(T::AccountId, ConflictType), // Key for tracking nonces
+		u32,
+		ValueQuery,
 	>;
 
 	/// On-chain remarks
@@ -906,22 +1075,35 @@ pub mod pallet {
 	pub type Remarks<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
-		T::Hash, // Remark ID
-		OnChainRemark<T::AccountId, T::BlockNumber, BoundedVec<u8, T::MaxJustificationLength>>,
+		(T::AccountId, RemarkCategory, u32), // (author, category, nonce)
+		OnChainRemark<T::BlockNumber, BoundedVec<u8, T::MaxRemarkContentLength>>,
+		OptionQuery,
 	>;
 
+	/// Stores the next nonce for a given author and category pair
+	#[pallet::storage]
+	#[pallet::getter(fn remark_nonces)]
+	pub type RemarkNonces<T: Config> =
+		StorageMap<_, Blake2_128Concat, (T::AccountId, RemarkCategory), u32, ValueQuery>;
+
 	/// Professional service providers registry
+	///
+	/// Maps from provider account to details about the service provider.
+	/// The account must have a verified identity through the identity pallet.
+	/// Most provider information is stored in their on-chain identity.
 	#[pallet::storage]
 	#[pallet::getter(fn service_providers)]
 	pub type ServiceProviders<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
-		T::Hash, // Provider ID
+		T::AccountId, // Provider account ID (must have verified identity)
 		ServiceProviderDetails<
 			T::AccountId,
 			T::BlockNumber,
-			BoundedVec<u8, T::MaxDescriptionLength>,
+			BoundedVec<ProfessionalServiceType, T::MaxServiceTypes>,
+			BoundedVec<u8, T::MaxEvidenceInfoLength>,
 		>,
+		OptionQuery,
 	>;
 
 	/// Professional service referrals
@@ -931,13 +1113,23 @@ pub mod pallet {
 		_,
 		Blake2_128Concat,
 		T::Hash, // Referral ID
-		ServiceReferral<T::AccountId, T::BlockNumber, BoundedVec<u8, T::MaxDescriptionLength>>,
+		ServiceReferral<
+			T::AccountId,
+			T::BlockNumber,
+			BoundedVec<ProfessionalServiceType, T::MaxServiceTypes>,
+			BoundedVec<u8, T::MaxDescriptionLength>,
+			BoundedVec<u8, T::MaxCompensationDetailsLength>,
+			H256,
+		>,
 	>;
 
 	/// Governance health metrics
 	#[pallet::storage]
 	#[pallet::getter(fn governance_health)]
-	pub type GovernanceHealth<T: Config> = StorageValue<_, GovernanceHealthMetrics<T::BlockNumber>>;
+	pub type GovernanceHealth<T: Config> = StorageValue<
+		_,
+		GovernanceHealthMetrics<T::BlockNumber, BoundedVec<u8, T::MaxEvidenceInfoLength>>,
+	>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -952,20 +1144,33 @@ pub mod pallet {
 		/// Emergency committee formed
 		EmergencyCommitteeFormed {
 			emergency_id: T::Hash,
-			members: Vec<(T::AccountId, EmergencyRole)>,
+			members: BoundedVec<(T::AccountId, EmergencyRole), T::MaxEmergencyCommitteeMembers>,
 		},
 		/// Emergency resolved
 		EmergencyResolved {
 			emergency_id: T::Hash,
 			abuse_detected: bool,
-			resolution_summary: Vec<u8>,
+			resolution_summary: BoundedVec<u8, T::MaxResolutionLength>,
 		},
 		/// Appeal submitted
-		AppealSubmitted { appeal_id: T::Hash, appellant: T::AccountId, original_decision: Vec<u8> },
+		AppealSubmitted {
+			appeal_id: T::Hash,
+			appellant: T::AccountId,
+			original_decision: BoundedVec<u8, T::MaxJustificationLength>,
+		},
 		/// Appeal committee formed
-		AppealCommitteeFormed { appeal_id: T::Hash, members: Vec<T::AccountId> },
+		AppealCommitteeFormed {
+			appeal_id: T::Hash,
+			members: BoundedVec<T::AccountId, T::MaxAppealCommitteeMembers>,
+		},
 		/// Appeal decided
-		AppealDecided { appeal_id: T::Hash, decision: AppealDecision },
+		AppealDecided {
+			appeal_id: T::Hash,
+			decider: T::AccountId,
+			decision: AppealDecision,
+			justification: BoundedVec<u8, T::MaxJustificationLength>,
+			evidence_hash: Option<H256>,
+		},
 		/// Cross-collective integration established
 		///
 		/// Emitted when a new cross-collective integration is established between the
@@ -980,67 +1185,142 @@ pub mod pallet {
 			mechanism: IntegrationMechanism,
 			/// Collective being integrated with
 			target_collective: TargetCollective,
+			/// Description of the integration
+			description: BoundedVec<u8, T::MaxDescriptionLength>,
+			/// Ambassador participants in the integration
+			ambassador_participants: BoundedVec<T::AccountId, T::MaxSourceParticipants>,
+			/// Target collective participants in the integration
+			target_participants: BoundedVec<T::AccountId, T::MaxTargetParticipants>,
+			/// Optional hash of evidence supporting the integration
+			evidence_hash: Option<H256>,
+			/// Block number when the integration was last updated
+			last_updated: T::BlockNumber,
 		},
-		/// Disciplinary action taken
-		DisciplinaryActionTaken {
+		/// Disciplinary action registered
+		DisciplinaryActionRegistered {
 			discipline_id: T::Hash,
 			subject: T::AccountId,
 			level: DisciplineLevel,
-			reason: Vec<u8>,
+			reason: BoundedVec<u8, T::MaxJustificationLength>,
 		},
-		/// Rank transition initiated
-		RankTransitionInitiated {
+		/// Disciplinary action resolved
+		DisciplinaryActionResolved {
+			discipline_id: T::Hash,
+			subject: T::AccountId,
+			resolution_summary: BoundedVec<u8, T::MaxResolutionLength>,
+			evidence_hash: Option<H256>,
+		},
+		/// Rank transition recorded
+		RankTransitionRegistered {
 			transition_id: T::Hash,
 			member: T::AccountId,
 			transition_type: TransitionType,
 			previous_rank: Rank,
 			new_rank: Rank,
+			effective_at: T::BlockNumber,
+			evidence_hash: Option<H256>,
 		},
 		/// Conflict of interest registered
-		ConflictOfInterestRegistered {
-			conflict_id: T::Hash,
+		ConflictOfInterestSet {
 			member: T::AccountId,
 			conflict_type: ConflictType,
-			description: Vec<u8>,
+			description: BoundedVec<u8, T::MaxDescriptionLength>,
+			relates_to: Option<BoundedVec<u8, T::MaxDescriptionLength>>,
+			start_block: Option<T::BlockNumber>,
+			end_block: Option<T::BlockNumber>,
+			evidence_hash: Option<H256>,
+			nonce: Option<u32>,
+			last_updated: T::BlockNumber,
 		},
-		/// On-chain remark created
-		OnChainRemarkCreated {
-			remark_id: T::Hash,
+		/// Critical conflict of interest detected during committee formation
+		CriticalEmergencyConflictOfInterestDetected {
+			emergency_id: T::Hash,
+			member: T::AccountId,
+			conflict_type: ConflictType,
+		},
+		/// Non-critical conflict of interest warning during committee formation
+		NonCriticalEmergencyConflictOfInterestWarning {
+			emergency_id: T::Hash,
+			member: T::AccountId,
+			conflict_type: ConflictType,
+		},
+		/// Critical conflict of interest detected during appeal committee formation
+		CriticalAppealConflictDetected {
+			appeal_id: T::Hash,
+			member: T::AccountId,
+			conflict_type: ConflictType,
+		},
+		/// Non-critical conflict of interest warning during appeal committee formation
+		NonCriticalAppealConflictWarning {
+			appeal_id: T::Hash,
+			member: T::AccountId,
+			conflict_type: ConflictType,
+		},
+		/// Critical conflict of interest detected during integration establishment
+		CriticalIntegrationConflictDetected {
+			integration_id: T::Hash,
+			member: T::AccountId,
+			conflict_type: ConflictType,
+		},
+		/// Non-critical conflict of interest warning during integration establishment
+		NonCriticalIntegrationConflictWarning {
+			integration_id: T::Hash,
+			member: T::AccountId,
+			conflict_type: ConflictType,
+		},
+		/// On-chain remark created or updated
+		RemarkSet {
 			author: T::AccountId,
 			category: RemarkCategory,
-			unique_id: Vec<u8>,
+			content: BoundedVec<u8, T::MaxRemarkContentLength>,
+			evidence_hash: Option<H256>,
+			nonce: u32,
+			last_updated: T::BlockNumber,
 		},
 		/// Governance health metrics updated
-		GovernanceHealthUpdated {
+		GovernanceHealthMetricsSet {
 			participation_rate: u8,
 			vote_concentration: u8,
 			avg_response_time: T::BlockNumber,
+			start_block: T::BlockNumber,
+			end_block: T::BlockNumber,
+			evidence_info: BoundedVec<u8, T::MaxEvidenceInfoLength>,
+			evidence_hash: Option<H256>,
+			last_updated: T::BlockNumber,
 		},
-		/// Professional service provider registered
-		ServiceProviderRegistered {
-			/// Unique identifier for the service provider
-			provider_id: T::Hash,
+		/// Professional service provider set
+		ServiceProviderSet {
 			/// Account of the provider (must have verified identity)
 			provider_account: T::AccountId,
-			/// Account that registered the provider
-			registrant: T::AccountId,
-			/// Service-specific name of the provider (may differ from identity name)
-			provider_name: Vec<u8>,
 			/// Types of services offered
-			service_types: Vec<ProfessionalServiceType>,
+			service_types: BoundedVec<ProfessionalServiceType, T::MaxServiceTypes>,
+			/// Evidence information supporting the provider's credentials
+			evidence_info: BoundedVec<u8, T::MaxEvidenceInfoLength>,
+			/// Optional hash of evidence supporting the provider's credentials
+			evidence_hash: Option<H256>,
+			/// Last updated block
+			last_updated: T::BlockNumber,
 		},
 		/// Professional service referral created
-		ServiceReferralCreated {
+		ServiceReferralSet {
 			/// Unique identifier for the referral
 			referral_id: T::Hash,
 			/// Account that made the referral
 			referrer: T::AccountId,
-			/// Provider being referred to
-			provider_id: T::Hash,
-			/// Type of service being referred
-			service_type: ProfessionalServiceType,
-			/// Whether the referrer disclosed receiving compensation for this referral
+			/// Provider being referred to (account with verified identity)
+			provider_account: T::AccountId,
+			/// Types of service being referred
+			service_types: BoundedVec<ProfessionalServiceType, T::MaxServiceTypes>,
+			/// Description of the referral
+			description: BoundedVec<u8, T::MaxDescriptionLength>,
+			/// Whether the referrer disclosed receiving compensation for this referral (transparency requirement)
 			compensation_disclosed: bool,
+			/// Optional details of compensation if disclosed
+			compensation_details: Option<BoundedVec<u8, T::MaxCompensationDetailsLength>>,
+			/// Optional hash of evidence supporting the referral
+			evidence_hash: Option<H256>,
+			/// Last updated block
+			last_updated: T::BlockNumber,
 		},
 	}
 
@@ -1054,12 +1334,16 @@ pub mod pallet {
 		CommitteeAlreadyFormed,
 		/// Emergency committee not formed
 		CommitteeNotFormed,
+		/// Invalid block period
+		InvalidBlockPeriod,
 		/// Invalid committee composition
 		InvalidCommitteeComposition,
 		/// Not authorized origin
 		NotAuthorizedOrigin,
 		/// Not a committee member
 		NotCommitteeMember,
+		/// Too many committee members
+		TooManyCommitteeMembers,
 		/// Appeal not found
 		AppealNotFound,
 		/// Appeal already decided
@@ -1072,16 +1356,16 @@ pub mod pallet {
 		IntegrationAlreadyExists,
 		/// Integration not found
 		IntegrationNotFound,
-		/// Too many committee members
-		TooManyCommitteeMembers,
-		/// Description is too long
-		TooLongDescription,
-		/// Justification is too long
-		JustificationTooLong,
-		/// Too many participants
-		TooManyParticipants,
 		/// Missing required role
 		MissingRequiredRole,
+		/// Conflict of interest not found
+		ConflictOfInterestNotFound,
+		/// Conflict of interest detected
+		ConflictOfInterestDetected,
+		/// Too many conflict of interest checks
+		TooManyConflictOfInterestChecks,
+		/// Remark not found
+		RemarkNotFound,
 		/// Service provider not found
 		ServiceProviderNotFound,
 		/// Service provider already registered
@@ -1090,14 +1374,12 @@ pub mod pallet {
 		IdentityNotVerified,
 		/// Insufficient rank for the operation
 		InsufficientRank,
-		/// Insufficient rank to register service provider
-		InsufficientRankForProviderRegistry,
-		/// Insufficient rank to create service referral
-		InsufficientRankForReferral,
 		/// Missing compensation disclosure
 		MissingCompensationDisclosure,
-		/// Too many service types
-		TooManyServiceTypes,
+		/// Disciplinary action not found
+		DisciplinaryActionNotFound,
+		/// Disciplinary action already resolved
+		DisciplinaryActionAlreadyResolved,
 	}
 
 	#[pallet::call]
@@ -1112,7 +1394,7 @@ pub mod pallet {
 		/// - `severity`: Severity level of the emergency
 		/// - `justification`: Justification for declaring the emergency, should include the location
 		///   where any off-chain evidence is stored for future reference
-		/// - `evidence`: Optional hash of evidence supporting the emergency declaration
+		/// - `evidence_hash`: Optional hash of evidence supporting the emergency declaration
 		///
 		/// Emits `EmergencyActivated` event when successful.
 		#[pallet::call_index(0)]
@@ -1121,8 +1403,8 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			emergency_type: EmergencyType,
 			severity: EmergencySeverity,
-			justification: Vec<u8>,
-			evidence: Option<H256>,
+			justification: BoundedVec<u8, T::MaxJustificationLength>,
+			evidence_hash: Option<H256>,
 		) -> DispatchResult {
 			T::EmergencyOrigin::ensure_origin(origin.clone())?;
 			let initiator = ensure_signed(origin)?;
@@ -1141,19 +1423,14 @@ pub mod pallet {
 				Error::<T>::InsufficientRank
 			);
 
-			let bounded_justification: BoundedVec<_, _> =
-				justification.try_into().map_err(|_| Error::<T>::JustificationTooLong)?;
-
 			let emergency_details = EmergencyDetails {
 				emergency_type: emergency_type.clone(),
 				severity: severity.clone(),
 				initiator: initiator.clone(),
-				justification: bounded_justification,
-				declared_at: <T as Config>::BlockNumber::from(
-					frame_system::Pallet::<T>::block_number().saturated_into::<u32>(),
-				),
+				justification,
+				declared_at: frame_system::Pallet::<T>::block_number().saturated_into(),
 				resolved_at: None,
-				evidence,
+				evidence_hash,
 				abuse_detected: false,
 			};
 
@@ -1185,7 +1462,7 @@ pub mod pallet {
 		pub fn form_emergency_committee(
 			origin: OriginFor<T>,
 			emergency_id: T::Hash,
-			members: Vec<(T::AccountId, EmergencyRole)>,
+			members: BoundedVec<(T::AccountId, EmergencyRole), T::MaxEmergencyCommitteeMembers>,
 		) -> DispatchResult {
 			// Check origin using CommitteeFormationOrigin filter
 			T::CommitteeFormationOrigin::ensure_origin(origin.clone())?;
@@ -1206,6 +1483,52 @@ pub mod pallet {
 				Error::<T>::CommitteeAlreadyFormed
 			);
 
+			// Check for conflicts of interest for each proposed committee member
+			let mut conflict_check_count: u32 = 0;
+			let max_conflict_checks = T::MaxConflictOfInterestChecks::get();
+
+			for (member, _) in &members {
+				// Check if this member has conflicts of interest related to this emergency
+				let emergency_id_str = format!("{:?}", emergency_id);
+
+				for ((account_id, conflict_type, _), conflict) in Conflicts::<T>::iter() {
+					// Increment the counter and check if we've exceeded the maximum
+					conflict_check_count += 1;
+					ensure!(
+						conflict_check_count <= max_conflict_checks,
+						Error::<T>::TooManyConflictOfInterestChecks
+					);
+
+					// Check if this conflict of interest belongs to a committee member and relates to this emergency
+					if account_id == *member
+						&& conflict.relates_to.as_ref().map_or(false, |relates_to| {
+							relates_to.as_slice() == emergency_id_str.as_bytes()
+						}) {
+						// Use the IsConflictCritical trait to determine if this is a critical conflict
+						if conflict_type.is_critical() {
+							// Critical conflict detected that prevents committee formation
+							Self::deposit_event(
+								Event::CriticalEmergencyConflictOfInterestDetected {
+									emergency_id,
+									member: account_id.clone(),
+									conflict_type: conflict_type.clone(),
+								},
+							);
+							return Err(Error::<T>::ConflictOfInterestDetected.into());
+						} else {
+							// Non-critical conflict detected that emits warning but allows committee formation
+							Self::deposit_event(
+								Event::NonCriticalEmergencyConflictOfInterestWarning {
+									emergency_id,
+									member: account_id.clone(),
+									conflict_type: conflict_type.clone(),
+								},
+							);
+						}
+					}
+				}
+			}
+
 			// Check committee composition requirements
 			let mut has_technical_lead = false;
 			let mut has_governance_rep = false;
@@ -1223,10 +1546,7 @@ pub mod pallet {
 			ensure!(has_governance_rep, Error::<T>::MissingRequiredRole);
 			ensure!(has_independent_expert, Error::<T>::MissingRequiredRole);
 
-			let bounded_members: BoundedVec<_, _> =
-				members.clone().try_into().map_err(|_| Error::<T>::TooManyCommitteeMembers)?;
-
-			EmergencyCommittees::<T>::insert(emergency_id, bounded_members);
+			EmergencyCommittees::<T>::insert(emergency_id, members.clone());
 
 			Self::deposit_event(Event::EmergencyCommitteeFormed { emergency_id, members });
 
@@ -1242,7 +1562,7 @@ pub mod pallet {
 		/// - `abuse_detected`: Abuse detected during the emergency response or not
 		/// - `resolution_summary`: Summary of the resolution actions, should include the location
 		///   where any off-chain evidence is stored for future reference
-		/// - `evidence`: Optional hash of evidence supporting the resolution
+		/// - `evidence_hash`: Optional hash of evidence supporting the resolution
 		///
 		/// Emits `EmergencyResolved` event when successful.
 		#[pallet::call_index(2)]
@@ -1251,23 +1571,31 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			emergency_id: T::Hash,
 			abuse_detected: bool,
-			resolution_summary: Vec<u8>,
-			evidence: Option<H256>,
+			resolution_summary: BoundedVec<u8, T::MaxResolutionLength>,
+			evidence_hash: Option<H256>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin.clone())?;
 
 			// Check that the caller has a verified identity
 			ensure!(T::IdentityRegistrar::has_identity(&who), Error::<T>::IdentityNotVerified);
 
+			// Ensure the caller has at least the minimum rank required for emergency response authority
+			ensure!(
+				T::RankChecker::has_minimum_rank(
+					&who,
+					T::MinRankForEmergencyResponseAuthority::get()
+				),
+				Error::<T>::InsufficientRank
+			);
+
 			Emergencies::<T>::try_mutate(emergency_id, |maybe_emergency| -> DispatchResult {
 				let emergency = maybe_emergency.as_mut().ok_or(Error::<T>::EmergencyNotFound)?;
 				ensure!(emergency.resolved_at.is_none(), Error::<T>::EmergencyAlreadyResolved);
 
-				emergency.resolved_at = Some(<T as Config>::BlockNumber::from(
-					frame_system::Pallet::<T>::block_number().saturated_into::<u32>(),
-				));
+				emergency.resolved_at =
+					Some(frame_system::Pallet::<T>::block_number().saturated_into());
 				emergency.abuse_detected = abuse_detected;
-				emergency.evidence = evidence;
+				emergency.evidence_hash = evidence_hash;
 
 				Ok(())
 			})?;
@@ -1293,6 +1621,143 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Register disciplinary action
+		///
+		/// Allows authorized users to register taking disciplinary action against a member.
+		/// This extrinsic only documents the disciplinary action for governance transparency and accountability.
+		///
+		/// Parameters:
+		/// - `subject`: Account ID of the member to be disciplined
+		/// - `level`: Level of discipline to be applied
+		/// - `reason`: Reason for the disciplinary action, must include the location
+		///   where any off-chain evidence (referenced by the `evidence_hash`) is stored
+		/// - `duration`: Duration of the disciplinary action (if applicable)
+		/// - `evidence_hash`: Optional hash of evidence supporting the disciplinary action.
+		///   The actual evidence is stored off-chain, and its location should be
+		///   referenced in the reason field
+		///
+		/// Emits `DisciplinaryActionRegistered` event when successful.
+		#[pallet::call_index(7)]
+		#[pallet::weight(T::WeightInfo::register_disciplinary_action())]
+		pub fn register_disciplinary_action(
+			origin: OriginFor<T>,
+			subject: T::AccountId,
+			level: DisciplineLevel,
+			reason: BoundedVec<u8, T::MaxJustificationLength>,
+			duration: Option<T::BlockNumber>,
+			evidence_hash: Option<H256>,
+		) -> DispatchResult {
+			T::EmergencyOrigin::ensure_origin(origin.clone())?;
+			let issuer = ensure_signed(origin.clone())?;
+
+			// Check that the caller has a verified identity
+			ensure!(T::IdentityRegistrar::has_identity(&issuer), Error::<T>::IdentityNotVerified);
+
+			ensure!(
+				T::RankChecker::has_minimum_rank(
+					&issuer,
+					T::MinRankForDisciplinaryActionEnforcement::get()
+				),
+				Error::<T>::InsufficientRank
+			);
+
+			let discipline_details = DisciplineDetails {
+				subject: subject.clone(),
+				issuer,
+				level: level.clone(),
+				reason: reason.clone(),
+				issued_at: frame_system::Pallet::<T>::block_number().saturated_into(),
+				duration,
+				evidence_hash,
+				active: true,
+			};
+
+			let discipline_id = T::Hashing::hash_of(&discipline_details);
+
+			Disciplines::<T>::insert(discipline_id, discipline_details);
+
+			Self::deposit_event(Event::DisciplinaryActionRegistered {
+				discipline_id,
+				subject,
+				level,
+				reason,
+			});
+
+			Ok(())
+		}
+
+		/// Resolve disciplinary action
+		///
+		/// Allows authorized users to resolve a disciplinary action, setting its active status to false.
+		/// This follows the Progressive Enforcement pattern from the Ambassador Fellowship Manifesto,
+		/// providing a remediation path for correction.
+		///
+		/// Parameters:
+		/// - `discipline_id`: ID of the disciplinary action to resolve
+		/// - `resolution_summary`: Summary of the resolution, should include the location
+		///   where any off-chain evidence is stored for future reference
+		/// - `evidence_hash`: Optional hash of evidence supporting the resolution
+		///
+		/// Emits `DisciplinaryActionResolved` event when successful.
+		#[pallet::call_index(8)]
+		#[pallet::weight(T::WeightInfo::resolve_disciplinary_action())]
+		pub fn resolve_disciplinary_action(
+			origin: OriginFor<T>,
+			discipline_id: T::Hash,
+			resolution_summary: BoundedVec<u8, T::MaxResolutionLength>,
+			evidence_hash: Option<H256>,
+		) -> DispatchResult {
+			T::EmergencyOrigin::ensure_origin(origin.clone())?;
+			let resolver = ensure_signed(origin.clone())?;
+
+			// Check that the caller has a verified identity
+			ensure!(T::IdentityRegistrar::has_identity(&resolver), Error::<T>::IdentityNotVerified);
+
+			// Ensure the caller has sufficient rank
+			ensure!(
+				T::RankChecker::has_minimum_rank(
+					&resolver,
+					T::MinRankForDisciplinaryActionEnforcement::get()
+				),
+				Error::<T>::InsufficientRank
+			);
+
+			// Ensure the disciplinary action exists
+			ensure!(
+				Disciplines::<T>::contains_key(discipline_id),
+				Error::<T>::DisciplinaryActionNotFound
+			);
+
+			// Update the disciplinary action to set active to false
+			Disciplines::<T>::try_mutate(discipline_id, |maybe_discipline| -> DispatchResult {
+				let discipline =
+					maybe_discipline.as_mut().ok_or(Error::<T>::DisciplinaryActionNotFound)?;
+
+				// Ensure the disciplinary action is currently active
+				ensure!(discipline.active, Error::<T>::DisciplinaryActionAlreadyResolved);
+
+				// Set the disciplinary action as inactive
+				discipline.active = false;
+
+				Ok(())
+			})?;
+
+			// Get the subject from the disciplinary action
+			let subject = Disciplines::<T>::get(discipline_id)
+				.map(|d| d.subject)
+				.ok_or(Error::<T>::DisciplinaryActionNotFound)?;
+
+			// Emit event
+			Self::deposit_event(Event::DisciplinaryActionResolved {
+				discipline_id,
+				subject,
+				resolution_summary,
+				evidence_hash,
+			});
+
+			Ok(())
+		}
+
 		/// Submit appeal
 		///
 		/// Allows any Ambassador to submit an appeal against a decision.
@@ -1301,16 +1766,16 @@ pub mod pallet {
 		/// - `original_decision`: Description of the original decision being appealed
 		/// - `justification`: Justification for the appeal, should include the location
 		///   where any off-chain evidence is stored for future reference
-		/// - `evidence`: Optional hash of evidence supporting the appeal
+		/// - `evidence_hash`: Optional hash of evidence supporting the appeal
 		///
 		/// Emits `AppealSubmitted` event when successful.
-		#[pallet::call_index(3)]
+		#[pallet::call_index(9)]
 		#[pallet::weight(T::WeightInfo::submit_appeal())]
 		pub fn submit_appeal(
 			origin: OriginFor<T>,
-			original_decision: Vec<u8>,
-			justification: Vec<u8>,
-			evidence: Option<H256>,
+			original_decision: BoundedVec<u8, T::MaxJustificationLength>,
+			justification: BoundedVec<u8, T::MaxJustificationLength>,
+			evidence_hash: Option<H256>,
 		) -> DispatchResult {
 			T::AppealSubmissionOrigin::ensure_origin(origin.clone())?;
 			let appellant = ensure_signed(origin)?;
@@ -1327,25 +1792,15 @@ pub mod pallet {
 				Error::<T>::InsufficientRank
 			);
 
-			let bounded_original_decision: BoundedVec<_, _> = original_decision
-				.clone()
-				.try_into()
-				.map_err(|_| Error::<T>::TooManyCommitteeMembers)?;
-
-			let bounded_justification: BoundedVec<_, _> =
-				justification.try_into().map_err(|_| Error::<T>::JustificationTooLong)?;
-
 			let appeal_details = AppealDetails {
 				appellant: appellant.clone(),
-				original_decision: bounded_original_decision,
-				justification: bounded_justification,
-				submitted_at: <T as Config>::BlockNumber::from(
-					frame_system::Pallet::<T>::block_number().saturated_into::<u32>(),
-				),
+				original_decision: original_decision.clone(),
+				justification,
+				submitted_at: frame_system::Pallet::<T>::block_number().saturated_into(),
 				status: AppealStatus::Submitted,
 				decision: None,
 				decided_at: None,
-				evidence,
+				evidence_hash,
 			};
 
 			let appeal_id = T::Hashing::hash_of(&appeal_details);
@@ -1366,12 +1821,12 @@ pub mod pallet {
 		/// - `members`: List of committee members
 		///
 		/// Emits `AppealCommitteeFormed` event when successful.
-		#[pallet::call_index(4)]
+		#[pallet::call_index(10)]
 		#[pallet::weight(T::WeightInfo::form_appeal_committee())]
 		pub fn form_appeal_committee(
 			origin: OriginFor<T>,
 			appeal_id: T::Hash,
-			members: Vec<T::AccountId>,
+			members: BoundedVec<T::AccountId, T::MaxAppealCommitteeMembers>,
 		) -> DispatchResult {
 			T::AppealCommitteeOrigin::ensure_origin(origin.clone())?;
 			let who = ensure_signed(origin)?;
@@ -1391,10 +1846,53 @@ pub mod pallet {
 				Error::<T>::AppealCommitteeAlreadyFormed
 			);
 
-			let bounded_members: BoundedVec<_, _> =
-				members.clone().try_into().map_err(|_| Error::<T>::TooManyCommitteeMembers)?;
+			// Check for conflicts of interest for each proposed committee member
+			let mut conflict_check_count: u32 = 0;
+			let max_conflict_checks = T::MaxConflictOfInterestChecks::get();
 
-			AppealCommittees::<T>::insert(appeal_id, bounded_members);
+			for member in &members {
+				// Check if this member has conflicts of interest related to this appeal
+				let appeal_id_str = format!("{:?}", appeal_id);
+
+				for ((account_id, conflict_type, _), conflict) in Conflicts::<T>::iter() {
+					// Increment the counter and check if we've exceeded the maximum
+					conflict_check_count += 1;
+					ensure!(
+						conflict_check_count <= max_conflict_checks,
+						Error::<T>::TooManyConflictOfInterestChecks
+					);
+
+					// Check if this conflict belongs to a committee member and relates to this appeal
+					if account_id == *member
+						&& conflict.relates_to.as_ref().map_or(false, |relates_to| {
+							relates_to.as_slice() == appeal_id_str.as_bytes()
+						}) {
+						// Determine if this is a critical conflict that prevents committee participation
+						if conflict_type.is_critical() {
+							// Critical conflict detected that prevents committee formation
+							Self::deposit_event(
+								Event::CriticalEmergencyConflictOfInterestDetected {
+									appeal_id,
+									member: account_id.clone(),
+									conflict_type: conflict_type.clone(),
+								},
+							);
+							return Err(Error::<T>::ConflictOfInterestDetected.into());
+						} else {
+							// Non-critical conflict so emit warning but allow committee formation
+							Self::deposit_event(
+								Event::NonCriticalEmergencyConflictOfInterestWarning {
+									appeal_id,
+									member: account_id.clone(),
+									conflict_type: conflict_type.clone(),
+								},
+							);
+						}
+					}
+				}
+			}
+
+			AppealCommittees::<T>::insert(appeal_id, members.clone());
 
 			// Update appeal status
 			Appeals::<T>::try_mutate(appeal_id, |maybe_appeal| -> DispatchResult {
@@ -1415,20 +1913,29 @@ pub mod pallet {
 		/// Parameters:
 		/// - `appeal_id`: ID of the appeal
 		/// - `decision`: Decision on the appeal
+		/// - `justification`: Justification for the decision (includes reference to off-chain evidence)
+		/// - `evidence_hash`: Hash of evidence supporting the decision
 		///
 		/// Emits `AppealDecided` event when successful.
-		#[pallet::call_index(5)]
+		#[pallet::call_index(11)]
 		#[pallet::weight(T::WeightInfo::decide_appeal())]
 		pub fn decide_appeal(
 			origin: OriginFor<T>,
 			appeal_id: T::Hash,
 			decision: AppealDecision,
+			justification: BoundedVec<u8, T::MaxJustificationLength>,
+			evidence_hash: Option<H256>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin.clone())?;
 
 			// Check that the caller has a verified identity
 			ensure!(T::IdentityRegistrar::has_identity(&who), Error::<T>::IdentityNotVerified);
 
+			// Check that the caller has at least the minimum rank required for decide appeal
+			ensure!(
+				T::RankChecker::has_minimum_rank(&who, T::MinRankForDecideAppeal::get()),
+				Error::<T>::InsufficientRank
+			);
 			// Check if origin is a committee member
 			let committee = AppealCommittees::<T>::get(appeal_id)
 				.ok_or(Error::<T>::AppealCommitteeNotFormed)?;
@@ -1440,14 +1947,21 @@ pub mod pallet {
 
 				appeal.status = AppealStatus::Decided;
 				appeal.decision = Some(decision.clone());
-				appeal.decided_at = Some(<T as Config>::BlockNumber::from(
-					frame_system::Pallet::<T>::block_number().saturated_into::<u32>(),
-				));
+				appeal.decided_at =
+					Some(frame_system::Pallet::<T>::block_number().saturated_into());
+				appeal.justification = justification.clone();
+				appeal.evidence_hash = evidence_hash;
 
 				Ok(())
 			})?;
 
-			Self::deposit_event(Event::AppealDecided { appeal_id, decision });
+			Self::deposit_event(Event::AppealDecided {
+				appeal_id,
+				decider: who,
+				decision,
+				justification,
+				evidence_hash,
+			});
 
 			Ok(())
 		}
@@ -1466,7 +1980,7 @@ pub mod pallet {
 		///   in the integration activities and governance.
 		/// - `target_participants`: List of participants from the target collective who will be
 		///   collaborating with the Ambassador Fellowship.
-		/// - `agreement_hash`: Optional hash of the formal integration agreement document.
+		/// - `evidence_hash`: Optional evidence hash of the formal integration agreement document.
 		///   Creates an on-chain reference to the off-chain legal or governance document when provided.
 		///   Storage location of this document should be specified in the `description` parameter.
 		///
@@ -1477,16 +1991,17 @@ pub mod pallet {
 		/// - Joint Working Group: Create a working group between Ambassador Fellowship and Technical Fellowship
 		/// - Liaison System: Establish liaisons between Ambassador Fellowship and Secretary Collective
 		/// - Integrated Planning: Create joint planning cycles with other collectives
-		#[pallet::call_index(6)]
+		/// - Knowledge Sharing: Establish knowledge sharing between Ambassador Fellowship and other collectives
+		#[pallet::call_index(12)]
 		#[pallet::weight(T::WeightInfo::establish_integration())]
 		pub fn establish_integration(
 			origin: OriginFor<T>,
 			mechanism: IntegrationMechanism,
 			target_collective: TargetCollective,
-			description: Vec<u8>,
-			ambassador_participants: Vec<T::AccountId>,
-			target_participants: Vec<T::AccountId>,
-			agreement_hash: Option<H256>,
+			description: BoundedVec<u8, T::MaxDescriptionLength>,
+			ambassador_participants: BoundedVec<T::AccountId, T::MaxSourceParticipants>,
+			target_participants: BoundedVec<T::AccountId, T::MaxTargetParticipants>,
+			evidence_hash: Option<H256>,
 		) -> DispatchResult {
 			T::IntegrationOrigin::ensure_origin(origin.clone())?;
 			let who = ensure_signed(origin)?;
@@ -1500,138 +2015,122 @@ pub mod pallet {
 				Error::<T>::InsufficientRank
 			);
 
-			let bounded_description: BoundedVec<_, _> =
-				description.clone().try_into().map_err(|_| Error::<T>::TooLongDescription)?;
-
-			let bounded_ambassador_participants: BoundedVec<_, _> = ambassador_participants
-				.clone()
-				.try_into()
-				.map_err(|_| Error::<T>::TooManyParticipants)?;
-
-			let bounded_target_participants: BoundedVec<_, _> = target_participants
-				.clone()
-				.try_into()
-				.map_err(|_| Error::<T>::TooManyParticipants)?;
-
+			// Create integration details first to get the ID for conflict checking
 			let integration_details = IntegrationDetails {
 				mechanism: mechanism.clone(),
 				target_collective: target_collective.clone(),
-				description: bounded_description,
-				ambassador_participants: bounded_ambassador_participants,
-				target_participants: bounded_target_participants,
-				established_at: <T as Config>::BlockNumber::from(
-					frame_system::Pallet::<T>::block_number().saturated_into::<u32>(),
-				),
-				agreement_hash,
+				description: description.clone(),
+				ambassador_participants: ambassador_participants.clone(),
+				target_participants,
+				established_at: frame_system::Pallet::<T>::block_number().saturated_into(),
+				evidence_hash,
 			};
 
 			let integration_id = T::Hashing::hash_of(&integration_details);
 
+			// Ensure the integration doesn't already exist
 			ensure!(
 				!Integrations::<T>::contains_key(integration_id),
 				Error::<T>::IntegrationAlreadyExists
 			);
 
+			// Check for conflicts of interest for each ambassador participant
+			let mut conflict_check_count: u32 = 0;
+			let max_conflict_checks = T::MaxConflictOfInterestChecks::get();
+
+			for participant in &ambassador_participants {
+				// Check if this participant has conflicts of interest related to this integration
+				let integration_id_str = format!("{:?}", integration_id);
+
+				for ((account_id, conflict_type, _), conflict) in Conflicts::<T>::iter() {
+					// Increment the counter and check if we've exceeded the maximum
+					conflict_check_count += 1;
+					ensure!(
+						conflict_check_count <= max_conflict_checks,
+						Error::<T>::TooManyConflictOfInterestChecks
+					);
+
+					// Check if this conflict belongs to a participant and relates to this integration
+					if account_id == *participant
+						&& conflict.relates_to.as_ref().map_or(false, |relates_to| {
+							relates_to.as_slice() == integration_id_str.as_bytes()
+						}) {
+						// Use the IsConflictCritical trait to determine if this is a critical conflict
+						if conflict_type.is_critical() {
+							// Critical conflict detected that prevents integration establishment
+							Self::deposit_event(Event::CriticalIntegrationConflictDetected {
+								integration_id,
+								member: account_id.clone(),
+								conflict_type: conflict_type.clone(),
+							});
+							return Err(Error::<T>::ConflictOfInterestDetected.into());
+						} else {
+							// Non-critical conflict detected that emits warning but allows integration
+							Self::deposit_event(Event::NonCriticalIntegrationConflictWarning {
+								integration_id,
+								member: account_id.clone(),
+								conflict_type: conflict_type.clone(),
+							});
+						}
+					}
+				}
+			}
+
+			// Store the integration details
 			Integrations::<T>::insert(integration_id, integration_details);
 
 			Self::deposit_event(Event::IntegrationEstablished {
 				integration_id,
 				mechanism,
 				target_collective,
+				description,
+				ambassador_participants,
+				target_participants,
+				evidence_hash,
+				last_updated: frame_system::Pallet::<T>::block_number().saturated_into(),
 			});
 
 			Ok(())
 		}
 
-		/// Initiate disciplinary action
+		/// Record rank transition
 		///
-		/// Allows authorized users to take disciplinary action against a member.
+		/// Allows authorized users to record the intent for a rank transition for a member, but does NOT actually execute the rank change.
+		/// This extrinsic only documents the transition for governance transparency and accountability.
 		///
-		/// Parameters:
-		/// - `subject`: Account ID of the member to be disciplined
-		/// - `level`: Level of discipline to be applied
-		/// - `reason`: Reason for the disciplinary action, must include the location
-		///   where any off-chain evidence (referenced by the `evidence_hash`) is stored
-		/// - `duration`: Duration of the disciplinary action (if applicable)
-		/// - `evidence`: Optional hash of evidence supporting the disciplinary action.
-		///   The actual evidence is stored off-chain and its location should be
-		///   referenced in the `reason` field
-		///
-		/// Emits `DisciplinaryActionTaken` event when successful.
-		#[pallet::call_index(7)]
-		#[pallet::weight(T::WeightInfo::initiate_disciplinary_action())]
-		pub fn initiate_disciplinary_action(
-			origin: OriginFor<T>,
-			subject: T::AccountId,
-			level: DisciplineLevel,
-			reason: Vec<u8>,
-			duration: Option<T::BlockNumber>,
-			evidence: Option<H256>,
-		) -> DispatchResult {
-			T::EmergencyOrigin::ensure_origin(origin.clone())?;
-			let issuer = ensure_signed(origin.clone())?;
-
-			// Check that the caller has a verified identity
-			ensure!(T::IdentityRegistrar::has_identity(&issuer), Error::<T>::IdentityNotVerified);
-
-			let bounded_reason: BoundedVec<_, _> =
-				reason.clone().try_into().map_err(|_| Error::<T>::TooManyCommitteeMembers)?;
-
-			let discipline_details = DisciplineDetails {
-				subject: subject.clone(),
-				issuer,
-				level: level.clone(),
-				reason: bounded_reason,
-				issued_at: <T as Config>::BlockNumber::from(
-					frame_system::Pallet::<T>::block_number().saturated_into::<u32>(),
-				),
-				duration,
-				evidence,
-				active: true,
-			};
-
-			let discipline_id = T::Hashing::hash_of(&discipline_details);
-
-			Disciplines::<T>::insert(discipline_id, discipline_details);
-
-			Self::deposit_event(Event::DisciplinaryActionTaken {
-				discipline_id,
-				subject,
-				level,
-				reason,
-			});
-
-			Ok(())
-		}
-
-		/// Initiate rank transition
-		///
-		/// Allows authorized users to initiate a rank transition for a member.
-		/// Note: For standard promotions and demotions, consider using the `promote_member` and
-		/// `demote_member` extrinsics from the ranked-collective-ambassador pallet instead
-		/// since this extrinsic is intended for more complex transitions that require additional context.
+		/// IMPORTANT: This function only records the transition details on-chain. The actual rank change must be
+		/// executed separately using the appropriate mechanism:
+		/// - For standard promotions and demotions, use the `promote_member` and `demote_member` extrinsics
+		///   from the ranked-collective-ambassador pallet
+		/// - For complex transitions recorded with this extrinsic, a manual process must be followed to
+		///   execute the actual rank change once the `effective_at` block is reached
 		///
 		/// Parameters:
 		/// - `member`: Account ID of the member undergoing transition
 		/// - `transition_type`: Type of transition
 		/// - `previous_rank`: Previous rank of the member
 		/// - `new_rank`: New rank of the member
-		/// - `justification`: Justification for the transition
+		/// - `justification`: Justification for the transition, must include the location
+		///   where any off-chain evidence or documentation is stored for future reference
 		/// - `effective_at`: Block when the transition will be completed
 		/// - `successor`: Successor account (if applicable)
+		/// - `evidence_hash`: Optional hash of the evidence supporting this transition.
+		///   The actual evidence is stored off-chain, and its location should be
+		///   referenced in the `justification` field
 		///
-		/// Emits `RankTransitionInitiated` event when successful.
-		#[pallet::call_index(8)]
-		#[pallet::weight(T::WeightInfo::initiate_rank_transition())]
-		pub fn initiate_rank_transition(
+		/// Emits `RankTransitionRegistered` event when successful.
+		#[pallet::call_index(13)]
+		#[pallet::weight(T::WeightInfo::register_rank_transition())]
+		pub fn register_rank_transition(
 			origin: OriginFor<T>,
 			member: T::AccountId,
 			transition_type: TransitionType,
 			previous_rank: Rank,
 			new_rank: Rank,
-			justification: Vec<u8>,
+			justification: BoundedVec<u8, T::MaxJustificationLength>,
 			effective_at: T::BlockNumber,
 			successor: Option<T::AccountId>,
+			evidence_hash: Option<H256>,
 		) -> DispatchResult {
 			T::EmergencyOrigin::ensure_origin(origin.clone())?;
 			let initiator = ensure_signed(origin.clone())?;
@@ -1642,162 +2141,223 @@ pub mod pallet {
 				Error::<T>::IdentityNotVerified
 			);
 
-			let bounded_justification: BoundedVec<_, _> =
-				justification.clone().try_into().map_err(|_| Error::<T>::JustificationTooLong)?;
+			// Ensure the caller has at least the minimum rank required for role fulfillment contingency
+			ensure!(
+				T::RankChecker::has_minimum_rank(
+					&initiator,
+					T::MinRankForRoleFulfillmentContingency::get()
+				),
+				Error::<T>::InsufficientRank
+			);
 
 			let transition_details = TransitionDetails {
 				member: member.clone(),
 				transition_type: transition_type.clone(),
 				previous_rank,
 				new_rank,
-				justification: bounded_justification,
-				initiated_at: <T as Config>::BlockNumber::from(
-					frame_system::Pallet::<T>::block_number().saturated_into::<u32>(),
-				),
+				justification,
+				initiated_at: frame_system::Pallet::<T>::block_number().saturated_into(),
 				effective_at,
 				successor,
 				knowledge_transfer_complete: false,
+				evidence_hash,
 			};
 
 			let transition_id = T::Hashing::hash_of(&transition_details);
 
 			Transitions::<T>::insert(transition_id, transition_details);
 
-			Self::deposit_event(Event::RankTransitionInitiated {
+			Self::deposit_event(Event::RankTransitionRegistered {
 				transition_id,
 				member,
 				transition_type,
 				previous_rank,
 				new_rank,
+				effective_at,
+				evidence_hash,
 			});
 
 			Ok(())
 		}
 
-		/// Register conflict of interest
+		/// Set conflict of interest
 		///
-		/// Allows members to register conflicts of interest.
+		/// Allows members to set or update conflicts of interest.
 		///
 		/// Parameters:
 		/// - `conflict_type`: Type of conflict
-		/// - `description`: Description of the conflict
-		/// - `related_matter`: Related matter or decision
-		/// - `expires_at`: Block when the conflict expires (if applicable)
+		/// - `description`: Description of the conflict, should include the location
+		///   where any off-chain evidence is stored for future reference
+		/// - `relates_to`: Optionally the related matter or decision
+		/// - `start_block`: Optionally the block when conflict starts otherwise the current block used
+		/// - `end_block`: Optionally the block when conflict expires (if applicable)
+		/// - `evidence_hash`: Optional hash of evidence supporting the conflict declaration
+		/// - `nonce`: Optionally the nonce for tracking updates
 		///
-		/// Emits `ConflictOfInterestRegistered` event when successful.
-		#[pallet::call_index(9)]
-		#[pallet::weight(T::WeightInfo::register_conflict_of_interest())]
-		pub fn register_conflict_of_interest(
+		/// Emits `ConflictOfInterestSet` event when successful.
+		#[pallet::call_index(14)]
+		#[pallet::weight(T::WeightInfo::set_conflict_of_interest())]
+		pub fn set_conflict_of_interest(
 			origin: OriginFor<T>,
 			conflict_type: ConflictType,
-			description: Vec<u8>,
-			related_matter: Vec<u8>,
-			expires_at: Option<T::BlockNumber>,
+			description: BoundedVec<u8, T::MaxDescriptionLength>,
+			relates_to: Option<BoundedVec<u8, T::MaxDescriptionLength>>,
+			start_block: Option<T::BlockNumber>,
+			end_block: Option<T::BlockNumber>,
+			evidence_hash: Option<H256>,
+			nonce: Option<u32>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
 			// Check that the caller has a verified identity
 			ensure!(T::IdentityRegistrar::has_identity(&who), Error::<T>::IdentityNotVerified);
 
-			let bounded_description: BoundedVec<_, _> = description
-				.clone()
-				.try_into()
-				.map_err(|_| Error::<T>::TooManyCommitteeMembers)?;
+			// Ensure the caller has at least the minimum rank required for transparency mechanisms
+			ensure!(
+				T::RankChecker::has_minimum_rank(&who, T::MinRankToSetConflictOfInterest::get()),
+				Error::<T>::InsufficientRank
+			);
 
-			let bounded_related_matter: BoundedVec<_, _> = related_matter
-				.clone()
-				.try_into()
-				.map_err(|_| Error::<T>::TooManyCommitteeMembers)?;
+			// Get the current block number
+			let current_block = frame_system::Pallet::<T>::block_number().saturated_into();
 
+			// Determine the start block (default to current block if not provided)
+			let start_block = start_block.unwrap_or(current_block);
+
+			// Handle nonce for new or existing conflict
+			let nonce_to_use = if let Some(specific_nonce) = nonce {
+				// Verify the conflict exists if updating
+				ensure!(
+					Conflicts::<T>::contains_key((
+						who.clone(),
+						conflict_type.clone(),
+						specific_nonce
+					)),
+					Error::<T>::ConflictOfInterestNotFound
+				);
+				specific_nonce
+			} else {
+				// Create a new conflict with the next nonce
+				let author_type_key = (who.clone(), conflict_type.clone());
+				let next_nonce = ConflictNonces::<T>::get(author_type_key.clone());
+				ConflictNonces::<T>::insert(author_type_key, next_nonce + 1);
+				next_nonce
+			};
+
+			// Create the conflict registration
 			let conflict_registration = ConflictRegistration {
 				member: who.clone(),
 				conflict_type: conflict_type.clone(),
-				description: bounded_description,
-				related_matter: bounded_related_matter,
-				registered_at: <T as Config>::BlockNumber::from(
-					frame_system::Pallet::<T>::block_number().saturated_into::<u32>(),
-				),
-				expires_at,
-				active: true,
+				description: description.clone(),
+				relates_to: relates_to.clone(),
+				start_block: Some(start_block),
+				end_block,
+				evidence_hash,
+				last_updated: current_block,
 			};
 
-			let conflict_id = T::Hashing::hash_of(&conflict_registration);
+			// Store using composite key
+			Conflicts::<T>::insert(
+				(who.clone(), conflict_type.clone(), nonce_to_use),
+				conflict_registration,
+			);
 
-			Conflicts::<T>::insert(conflict_id, conflict_registration);
-
-			Self::deposit_event(Event::ConflictOfInterestRegistered {
-				conflict_id,
+			Self::deposit_event(Event::ConflictOfInterestSet {
 				member: who,
 				conflict_type,
 				description,
+				relates_to,
+				start_block: Some(start_block),
+				end_block,
+				evidence_hash,
+				nonce: Some(nonce_to_use),
+				last_updated: current_block,
 			});
 
 			Ok(())
 		}
 
-		/// Create on-chain remark
+		/// Create or update an on-chain remark
 		///
-		/// Allows authorized users to create structured on-chain remarks with metadata.
-		/// Unlike System::remark, this provides additional context and standardized format.
+		/// Allows authorized users to create or update on-chain remarks for governance transparency.
+		/// If a remark with the same author, category, and optionally provided nonce already exists, it will be updated.
 		///
 		/// Parameters:
 		/// - `category`: Category of the remark
-		/// - `unique_id`: Unique identifier for the remark
 		/// - `content`: Content of the remark, must include the location
-		///   where any off-chain evidence (referenced by the `related_hash`) is stored
+		///   where any off-chain evidence (referenced by the `evidence_hash`) is stored
 		///   for future reference and auditability
-		/// - `related_hash`: Related hash (if applicable). The actual evidence is stored
+		/// - `evidence_hash`: Optional hash of evidence supporting the remark. The actual evidence is stored
 		///   off-chain, and its location should be referenced in the `content` field
+		/// - `nonce`: Optional to update a specific nonce
 		///
-		/// Emits `OnChainRemarkCreated` event when successful.
-		#[pallet::call_index(10)]
-		#[pallet::weight(T::WeightInfo::create_remark())]
-		pub fn create_remark(
+		/// Emits `RemarkSet` event when successful.
+		#[pallet::call_index(15)]
+		#[pallet::weight(T::WeightInfo::set_remark())]
+		pub fn set_remark(
 			origin: OriginFor<T>,
 			category: RemarkCategory,
-			unique_id: Vec<u8>,
-			content: Vec<u8>,
-			related_hash: Option<H256>,
+			content: BoundedVec<u8, T::MaxRemarkContentLength>,
+			evidence_hash: Option<H256>,
+			nonce: Option<u32>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
 			// Check that the caller has a verified identity
 			ensure!(T::IdentityRegistrar::has_identity(&who), Error::<T>::IdentityNotVerified);
 
-			let bounded_unique_id: BoundedVec<_, _> =
-				unique_id.clone().try_into().map_err(|_| Error::<T>::TooManyCommitteeMembers)?;
+			// Check that the caller has the minimum required rank
+			ensure!(
+				T::RankChecker::has_minimum_rank(&who, T::MinRankToSetRemark::get()),
+				Error::<T>::InsufficientRank
+			);
 
-			let bounded_content: BoundedVec<_, _> =
-				content.clone().try_into().map_err(|_| Error::<T>::TooManyCommitteeMembers)?;
+			// Get the current block number
+			let current_block = frame_system::Pallet::<T>::block_number().saturated_into();
 
-			let on_chain_remark = OnChainRemark {
-				author: who.clone(),
-				category: category.clone(),
-				unique_id: bounded_unique_id,
-				content: bounded_content,
-				created_at: <T as Config>::BlockNumber::from(
-					frame_system::Pallet::<T>::block_number().saturated_into::<u32>(),
-				),
-				related_hash,
+			// Get the key for the author/category pair
+			let author_category_key = (who.clone(), category.clone());
+
+			// Determine which nonce to use
+			let nonce_to_update = if let Some(specific_nonce) = nonce {
+				// Check if the specified nonce exists
+				ensure!(
+					Remarks::<T>::contains_key((who.clone(), category.clone(), specific_nonce)),
+					Error::<T>::RemarkNotFound
+				);
+				specific_nonce
+			} else {
+				// Get the next nonce for this author/category pair
+				let next_nonce = RemarkNonces::<T>::get(author_category_key.clone());
+				// Increment the nonce for future remarks
+				RemarkNonces::<T>::insert(author_category_key, next_nonce + 1);
+				next_nonce
 			};
 
-			let remark_id = T::Hashing::hash_of(&on_chain_remark);
+			// Create or update the remark
+			let on_chain_remark = OnChainRemark {
+				content: content.clone(),
+				evidence_hash,
+				last_updated: current_block,
+			};
 
-			Remarks::<T>::insert(remark_id, on_chain_remark);
+			Remarks::<T>::insert((who.clone(), category.clone(), nonce_to_update), on_chain_remark);
 
-			Self::deposit_event(Event::OnChainRemarkCreated {
-				remark_id,
+			Self::deposit_event(Event::RemarkSet {
 				author: who,
 				category,
-				unique_id,
+				content,
+				evidence_hash,
+				nonce: nonce_to_update,
+				last_updated: current_block,
 			});
 
 			Ok(())
 		}
 
-		/// Update governance health metrics
+		/// Set governance health metrics
 		///
-		/// Allows authorized users to update governance health metrics.
+		/// Allows authorized users to set governance health metrics.
 		///
 		/// Parameters:
 		/// - `participation_rate`: Participation rate (0-100%) percentage of eligible
@@ -1807,65 +2367,85 @@ pub mod pallet {
 		///   of votes, while higher values indicate votes are concentrated among fewer participants
 		/// - `avg_response_time`: Average response time in blocks is the average time taken
 		///   to respond to governance actions
+		/// - `start_block`: Starting block number of the period these metrics cover
+		/// - `end_block`: Ending block number of the period these metrics cover
+		/// - `evidence_info`: Evidence information, must include the location
+		///   where any off-chain evidence is stored for future reference and auditability
+		/// - `evidence_hash`: Optional hash of the evidence supporting the reported metrics.
+		///   The actual evidence is stored off-chain, and its location should be
+		///   referenced in the evidence_info field
 		///
-		/// Emits `GovernanceHealthUpdated` event when successful.
-		#[pallet::call_index(11)]
-		#[pallet::weight(T::WeightInfo::update_governance_health_metrics())]
-		pub fn update_governance_health_metrics(
+		/// Emits `GovernanceHealthMetricsSet` event when successful.
+		#[pallet::call_index(16)]
+		#[pallet::weight(T::WeightInfo::set_governance_health_metrics())]
+		pub fn set_governance_health_metrics(
 			origin: OriginFor<T>,
 			participation_rate: u8,
 			vote_concentration: u8,
 			avg_response_time: T::BlockNumber,
+			start_block: T::BlockNumber,
+			end_block: T::BlockNumber,
+			evidence_info: BoundedVec<u8, T::MaxEvidenceInfoLength>,
+			evidence_hash: Option<H256>,
 		) -> DispatchResult {
 			T::EmergencyOrigin::ensure_origin(origin.clone())?;
 			let who = ensure_signed(origin.clone())?;
 
 			// Check that the caller has a verified identity
 			ensure!(T::IdentityRegistrar::has_identity(&who), Error::<T>::IdentityNotVerified);
+			ensure!(end_block > start_block, Error::<T>::InvalidBlockPeriod);
+
+			// Get the current block number
+			let current_block = frame_system::Pallet::<T>::block_number().saturated_into();
 
 			GovernanceHealth::<T>::put(GovernanceHealthMetrics {
 				participation_rate,
 				vote_concentration,
 				avg_response_time,
-				last_updated: <T as Config>::BlockNumber::from(
-					frame_system::Pallet::<T>::block_number().saturated_into::<u32>(),
-				),
+				start_block,
+				end_block,
+				evidence_info: evidence_info.clone(),
+				evidence_hash,
+				last_updated: current_block,
 			});
 
-			Self::deposit_event(Event::GovernanceHealthUpdated {
+			Self::deposit_event(Event::GovernanceHealthMetricsSet {
 				participation_rate,
 				vote_concentration,
 				avg_response_time,
+				start_block,
+				end_block,
+				evidence_info,
+				evidence_hash,
+				last_updated: current_block,
 			});
 
 			Ok(())
 		}
 
-		/// Register professional service provider
+		/// Set service provider
 		///
-		/// Allows authorized members to register professional service providers in the registry
-		/// using the referral framework mentioned in the Ambassador Fellowship Manifesto, and
-		/// where the provider must have a verified identity through the identity pallet.
+		/// Allows authorized users to register a new service provider or update an existing one.
 		///
 		/// Parameters:
-		/// - `provider_account`: Account of the service provider (must have verified identity)
-		/// - `provider_name`: Name or identifier of the service provider
-		/// - `service_types`: Types of professional services offered
-		/// - `contact_info`: Contact information for the provider, should include the location
-		///   where any off-chain evidence (referenced by the `evidence_hash`) is stored
+		/// - `provider_account`: Account of the provider (must have verified identity)
+		/// - `service_types`: Types of services offered
+		/// - `evidence_info`: Evidence information supporting the provider's credentials,
+		///   must include the location where any off-chain evidence is stored
 		///   for future reference and auditability
-		/// - `evidence_hash`: Optional hash of evidence supporting the provider's credentials
+		/// - `evidence_hash`: Optional hash of evidence supporting the provider's credentials,
+		///   where the actual evidence is stored off-chain, and its location should be
+		///   referenced in the evidence_info field
 		///
-		/// Emits `ServiceProviderRegistered` event when successful.
-		#[pallet::call_index(12)]
-		#[pallet::weight(T::WeightInfo::register_service_provider())]
-		pub fn register_service_provider(
+		/// Emits `ServiceProviderSet` event when successful.
+		#[pallet::call_index(17)]
+		#[pallet::weight(T::WeightInfo::set_service_provider())]
+		pub fn set_service_provider(
 			origin: OriginFor<T>,
 			provider_account: T::AccountId,
-			provider_name: Vec<u8>,
-			service_types: Vec<ProfessionalServiceType>,
-			contact_info: Vec<u8>,
-			_evidence_hash: Option<H256>,
+			service_types: BoundedVec<ProfessionalServiceType, T::MaxServiceTypes>,
+			evidence_info: BoundedVec<u8, T::MaxEvidenceInfoLength>,
+			evidence_hash: Option<H256>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
@@ -1875,7 +2455,7 @@ pub mod pallet {
 			// Ensure the caller has at least the minimum rank required to register a service provider
 			ensure!(
 				T::RankChecker::has_minimum_rank(&who, T::MinRankForProviderRegistry::get()),
-				Error::<T>::InsufficientRankForProviderRegistry
+				Error::<T>::InsufficientRank
 			);
 
 			// Ensure the provider account has a verified identity
@@ -1884,70 +2464,55 @@ pub mod pallet {
 				Error::<T>::IdentityNotVerified
 			);
 
-			let bounded_provider_name: BoundedVec<_, _> =
-				provider_name.clone().try_into().map_err(|_| Error::<T>::JustificationTooLong)?;
+			// Get the current block number
+			let current_block = frame_system::Pallet::<T>::block_number().saturated_into();
 
-			let bounded_contact_info: BoundedVec<_, _> =
-				contact_info.clone().try_into().map_err(|_| Error::<T>::JustificationTooLong)?;
-
-			let bounded_service_types: BoundedVec<ProfessionalServiceType, ConstU32<10>> =
-				service_types.clone().try_into().map_err(|_| Error::<T>::TooManyServiceTypes)?;
-
+			// Create or update the provider details
 			let provider_details = ServiceProviderDetails {
 				provider_account: provider_account.clone(),
-				provider_name: bounded_provider_name,
-				service_types: bounded_service_types,
-				contact_info: bounded_contact_info,
-				registrant: who.clone(),
-				registered_at: <T as Config>::BlockNumber::from(
-					frame_system::Pallet::<T>::block_number().saturated_into::<u32>(),
-				),
+				service_types: service_types.clone(),
+				evidence_info: evidence_info.clone(),
+				evidence_hash,
+				last_updated: current_block,
 			};
 
-			let provider_id = T::Hashing::hash_of(&provider_details);
+			// Set or update the provider
+			ServiceProviders::<T>::insert(&provider_account, provider_details);
 
-			// Ensure this provider hasn't been registered before
-			ensure!(
-				!ServiceProviders::<T>::contains_key(provider_id),
-				Error::<T>::ServiceProviderAlreadyRegistered
-			);
-
-			ServiceProviders::<T>::insert(provider_id, provider_details);
-
-			Self::deposit_event(Event::ServiceProviderRegistered {
-				provider_id,
+			Self::deposit_event(Event::ServiceProviderSet {
 				provider_account,
-				registrant: who,
-				provider_name,
 				service_types,
+				evidence_info,
+				evidence_hash,
+				last_updated: current_block,
 			});
 
 			Ok(())
 		}
 
-		/// Create professional service referral
+		/// Set professional service referral
 		///
-		/// Allows authorized members to create referrals to professional service providers
-		/// using the referral framework mentioned in the Ambassador Fellowship Manifesto.
+		/// Allows ambassadors to create referrals to registered professional service providers.
 		///
 		/// Parameters:
-		/// - `provider_id`: ID of the service provider being referred
-		/// - `service_type`: Type of service being referred
-		/// - `description`: Description of the referral, should include the location
-		///   where any off-chain evidence is stored for future reference and auditability
-		/// - `compensation_disclosed`: If compensation is being received for the referral or not
-		/// - `compensation_details`: Details of compensation if applicable
+		/// - `provider_account`: Account of the service provider (must be registered)
+		/// - `service_types`: Types of professional services being referred
+		/// - `description`: Description of the referral
+		/// - `compensation_disclosed`: Whether the referrer disclosed receiving compensation for this referral (transparency requirement)
+		/// - `compensation_details`: Details of compensation if disclosed
+		/// - `evidence_hash`: Optional hash of evidence supporting the referral
 		///
-		/// Emits `ServiceReferralCreated` event when successful.
-		#[pallet::call_index(13)]
-		#[pallet::weight(T::WeightInfo::create_service_referral())]
-		pub fn create_service_referral(
+		/// Emits `ServiceReferralSet` event when successful.
+		#[pallet::call_index(18)]
+		#[pallet::weight(T::WeightInfo::set_service_referral())]
+		pub fn set_service_referral(
 			origin: OriginFor<T>,
-			provider_id: T::Hash,
-			service_type: ProfessionalServiceType,
-			description: Vec<u8>,
+			provider_account: T::AccountId,
+			service_types: BoundedVec<ProfessionalServiceType, T::MaxServiceTypes>,
+			description: BoundedVec<u8, T::MaxDescriptionLength>,
 			compensation_disclosed: bool,
-			compensation_details: Option<Vec<u8>>,
+			compensation_details: Option<BoundedVec<u8, T::MaxCompensationDetailsLength>>,
+			evidence_hash: Option<H256>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
@@ -1957,55 +2522,48 @@ pub mod pallet {
 			// Ensure the caller has at least the minimum rank required to create a referral
 			ensure!(
 				T::RankChecker::has_minimum_rank(&who, T::MinRankForReferral::get()),
-				Error::<T>::InsufficientRankForReferral
+				Error::<T>::InsufficientRank
 			);
 
 			// Ensure the provider exists
-			let _provider = ServiceProviders::<T>::get(provider_id)
-				.ok_or(Error::<T>::ServiceProviderNotFound)?;
+			ensure!(
+				ServiceProviders::<T>::contains_key(&provider_account),
+				Error::<T>::ServiceProviderNotFound
+			);
 
 			// If compensation is received, ensure details are provided
 			if compensation_disclosed {
 				ensure!(compensation_details.is_some(), Error::<T>::MissingCompensationDisclosure);
 			}
 
-			let bounded_description: BoundedVec<_, _> =
-				description.clone().try_into().map_err(|_| Error::<T>::JustificationTooLong)?;
-
-			let bounded_compensation: Option<BoundedVec<_, _>> =
-				if let Some(comp) = compensation_details.clone() {
-					Some(comp.try_into().map_err(|_| Error::<T>::JustificationTooLong)?)
-				} else {
-					None
-				};
-
-			// Convert provider_id to BoundedVec for storage
-			let provider_id_bytes = provider_id.as_ref().to_vec();
-			let bounded_provider_id: BoundedVec<_, _> =
-				provider_id_bytes.try_into().map_err(|_| Error::<T>::JustificationTooLong)?;
+			// Get the current block number
+			let current_block = frame_system::Pallet::<T>::block_number().saturated_into();
 
 			let referral = ServiceReferral {
 				referrer: who.clone(),
-				provider_id: bounded_provider_id,
-				service_type: service_type.clone(),
-				description: bounded_description,
-				referred_at: <T as Config>::BlockNumber::from(
-					frame_system::Pallet::<T>::block_number().saturated_into::<u32>(),
-				),
+				provider_account: provider_account.clone(),
+				service_types: service_types.clone(),
+				description: description.clone(),
 				compensation_disclosed,
-				compensation_details: bounded_compensation,
+				compensation_details: compensation_details.clone(),
+				evidence_hash,
+				last_updated: current_block,
 			};
 
+			// Store the referral
 			let referral_id = T::Hashing::hash_of(&referral);
-
 			ServiceReferrals::<T>::insert(referral_id, referral);
 
-			Self::deposit_event(Event::ServiceReferralCreated {
+			Self::deposit_event(Event::ServiceReferralSet {
 				referral_id,
 				referrer: who,
-				provider_id,
-				service_type,
+				provider_account,
+				service_types,
+				description: description.clone(),
 				compensation_disclosed,
+				compensation_details: compensation_details.clone(),
+				evidence_hash,
+				last_updated: current_block,
 			});
 
 			Ok(())
