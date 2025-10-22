@@ -113,7 +113,8 @@ fn setup_identity_for_account(who: u64) {
 	assert!(who >= 1, "Account ID must be >= 1 to have verified identity");
 }
 
-// Helper function to assign ambassador rank
+// Helper function to assign ambassador rank.
+// Refer also to account IDs and associated ranks in MockRankChecker
 fn assign_ambassador_rank(who: u64, rank: u16) {
 	// Mock implementation - in the real tests this would interact with the RankedCollective pallet
 	// For our mock, we'll just assume all accounts with ID >= 1 can be assigned ranks
@@ -459,7 +460,7 @@ fn resolve_emergency_works() {
 			let members = BoundedVec::try_from(members_vec).unwrap();
 
 		assert_ok!(AmbassadorGovernance::<Runtime>::form_emergency_committee(
-			RuntimeOrigin::signed(3),
+			signed_origin(3),
 			emergency_id,
 			members.clone()
 		));
@@ -470,7 +471,7 @@ fn resolve_emergency_works() {
 
 		// Execute as committee member
 		assert_ok!(AmbassadorGovernance::<Runtime>::resolve_emergency(
-			RuntimeOrigin::signed(4),
+			signed_origin(4), // Committee member
 			emergency_id,
 			abuse_detected,
 			resolution_summary.clone(),
@@ -1296,6 +1297,7 @@ fn establish_integration_works() {
 				integration_id: _,
 				mechanism: m,
 				target_collective: tc,
+				..
 			}) = &event.event
 			{
 				if *m == mechanism && *tc == target_collective {
@@ -1702,11 +1704,10 @@ fn set_service_referral_works() {
 		// Clear events
 		frame_system::Pallet::<Runtime>::reset_events();
 
-		// Create referral as account 2 (has Rank II)
 		assert_ok!(AmbassadorGovernance::<Runtime>::set_service_referral(
 			RuntimeOrigin::signed(2),
 			provider_account,
-			BoundedVec::<ProfessionalServiceType, MaxServiceTypes>::try_from(vec![ProfessionalServiceType::LegalFinancial]).unwrap(),
+			BoundedVec::try_from(vec![ProfessionalServiceType::LegalFinancial]).unwrap(),
 			description.clone(),
 			compensation_disclosed,
 			compensation_details.clone(),
@@ -1992,7 +1993,8 @@ fn register_rank_transition_works() {
 		let transition_type = TransitionType::Promotion;
 		let previous_rank = 2;
 		let new_rank = 3;
-		let justification = BoundedVec::try_from(b"Excellent contributions to the ecosystem".to_vec()).unwrap();
+		let justification: BoundedVec<u8, <Runtime as crate::Config>::MaxJustificationLength> =
+			BoundedVec::try_from(b"Excellent contributions to the ecosystem".to_vec()).unwrap();
 		let effective_at = 100;
 		let successor = None;
 		let evidence_hash = Some(H256::random());
@@ -2065,7 +2067,8 @@ fn register_rank_transition_without_evidence_hash_works() {
 		let transition_type = TransitionType::Demotion;
 		let previous_rank = 3;
 		let new_rank = 2;
-		let justification = BoundedVec::try_from(b"Performance issues".to_vec()).unwrap();
+		let justification: BoundedVec<u8, <Runtime as crate::Config>::MaxJustificationLength> =
+			BoundedVec::try_from(b"Performance issues".to_vec()).unwrap();
 		let effective_at = 100;
 		let successor = None;
 		let evidence_hash = None; // No evidence hash provided
@@ -2139,7 +2142,8 @@ fn register_rank_transition_fails_with_insufficient_rank() {
 		let transition_type = TransitionType::Promotion;
 		let previous_rank = 2;
 		let new_rank = 3;
-		let justification = BoundedVec::try_from(b"Excellent contributions to the ecosystem".to_vec()).unwrap();
+		let justification: BoundedVec<u8, <Runtime as crate::Config>::MaxJustificationLength> =
+			BoundedVec::try_from(b"Excellent contributions to the ecosystem".to_vec()).unwrap();
 		let effective_at = 100;
 		let successor = None;
 		let evidence_hash = Some(H256::random());
@@ -2169,7 +2173,8 @@ fn register_rank_transition_fails_with_unverified_identity() {
 		let transition_type = TransitionType::Promotion;
 		let previous_rank = 2;
 		let new_rank = 3;
-		let justification = BoundedVec::try_from(b"Excellent contributions to the ecosystem".to_vec()).unwrap();
+		let justification: BoundedVec<u8, <Runtime as crate::Config>::MaxJustificationLength> =
+			BoundedVec::try_from(b"Excellent contributions to the ecosystem".to_vec()).unwrap();
 		let effective_at = 100;
 		let successor = None;
 		let evidence_hash = Some(H256::random());
@@ -2200,7 +2205,8 @@ fn register_rank_transition_with_successor_works() {
 		let transition_type = TransitionType::Resignation;
 		let previous_rank = 3;
 		let new_rank = 0;
-		let justification = BoundedVec::try_from(b"Moving to a different role".to_vec()).unwrap();
+		let justification: BoundedVec<u8, <Runtime as crate::Config>::MaxJustificationLength> =
+			BoundedVec::try_from(b"Moving to a different role".to_vec()).unwrap();
 		let effective_at = 100;
 		let successor = Some(2); // Account 2 will take over
 		let evidence_hash = Some(H256::random());
@@ -2273,7 +2279,7 @@ fn set_remark_works() {
 		let content = create_remark_content(100); // Include reference to off-chain evidence
 		let evidence_hash = Some(H256::random());
 
-		// Execute as account 2 (has Rank II, which should be sufficient)
+		// Execute as account 2 (has Rank II)
 		assert_ok!(AmbassadorGovernance::<Runtime>::set_remark(
 			RuntimeOrigin::signed(2),
 			category.clone(),
@@ -2662,26 +2668,22 @@ fn set_conflict_of_interest_multiple_conflicts_works() {
 fn register_conflict_of_interest_for_emergency_works() {
 	new_test_ext().execute_with(|| {
 		// Setup: Create accounts with verified identities
-		let initiator = account("initiator", 1, 1);
-		let committee_member = account("committee_member", 2, 2);
-
-		// Setup identities for both accounts
-		setup_identity_for_account(initiator.clone());
-		setup_identity_for_account(committee_member.clone());
+		let initiator = 3;
+		let committee_member = 4;
 
 		// Assign sufficient rank according to MinRankToActivateEmergencyProtocol
-		assign_ambassador_rank(initiator.clone(), 3);
+		assign_ambassador_rank(initiator, 3);
 		// Assign sufficient rank according to MinRankToFormEmergencyCommittee
-		assign_ambassador_rank(committee_member.clone(), 3);
+		assign_ambassador_rank(committee_member, 3);
 
 		// Step 1: Activate an emergency
 		let emergency_type = EmergencyType::SecurityVulnerability;
 		let severity = EmergencySeverity::Critical;
-		let justification = b"Critical security vulnerability detected in runtime".to_vec()
-			.try_into().unwrap();
+		let justification: BoundedVec<u8, <Runtime as crate::Config>::MaxJustificationLength> =
+			BoundedVec::try_from(b"Critical security vulnerability detected in runtime".to_vec()).unwrap();
 		let evidence_hash = H256::from_low_u64_be(1);
 
-		assert_ok!(AmbassadorGovernance::activate_emergency_protocol(
+		assert_ok!(AmbassadorGovernance::<Runtime>::activate_emergency_protocol(
 			RuntimeOrigin::signed(initiator.clone()),
 			emergency_type.clone(),
 			severity.clone(),
@@ -2699,14 +2701,15 @@ fn register_conflict_of_interest_for_emergency_works() {
 
 		// Step 2: Register a conflict of interest related to the emergency
 		let emergency_id_str = format!("{:?}", emergency_id);
-		let relates_to = emergency_id_str.as_bytes().to_vec().try_into().unwrap();
-		let description = format!("I have a professional relationship with the affected system vendor (evidence: ipfs://QmConflictOfInterest123)")
+		let relates_to: BoundedVec<u8, <Runtime as crate::Config>::MaxDescriptionLength> = emergency_id_str.as_bytes().to_vec().try_into().unwrap();
+		let description: BoundedVec<u8, <Runtime as crate::Config>::MaxDescriptionLength> = format!("I have a professional relationship with the affected system vendor (evidence: ipfs://QmConflictOfInterest123)")
 			.as_bytes().to_vec().try_into().unwrap();
 		let conflict_evidence_hash = sp_core::blake2_256("QmConflictOfInterest123".as_bytes()).into();
+		let conflict_type = ConflictType::ProfessionalCritical;
 
-		assert_ok!(AmbassadorGovernance::set_conflict_of_interest(
+		assert_ok!(AmbassadorGovernance::<Runtime>::set_conflict_of_interest(
 			RuntimeOrigin::signed(committee_member.clone()),
-			ConflictType::ProfessionalCritical,
+			conflict_type.clone(),
 			description.clone(),
 			Some(relates_to.clone()),
 			None, // start_block (defaults to current)
@@ -2716,37 +2719,37 @@ fn register_conflict_of_interest_for_emergency_works() {
 		));
 
 		// Verify the conflict of interest was registered correctly
-		let conflict_id = match System::events().last().unwrap().event {
+		let nonce = match System::events().last().unwrap().event {
 			RuntimeEvent::AmbassadorGovernance(
-					Event::ConflictOfInterestSet { nonce, .. }
+				Event::ConflictOfInterestSet { nonce, .. }
 			) => nonce,
 			_ => panic!("Expected ConflictOfInterestSet event"),
 		};
 
 		// Verify the conflict of interest details in storage
-		let conflict = Conflicts::<Runtime>::get(conflict_id).unwrap();
+		let conflict = Conflicts::<Runtime>::get((committee_member.clone(), conflict_type.clone(), nonce.unwrap_or(0))).unwrap();
 		assert_eq!(conflict.member, committee_member);
-		assert_eq!(conflict.conflict_type, ConflictType::ProfessionalCritical);
+		assert_eq!(conflict.conflict_type, conflict_type.clone());
 		assert_eq!(conflict.description, description);
 		assert_eq!(conflict.relates_to, Some(relates_to));
 		assert_eq!(conflict.evidence_hash, Some(conflict_evidence_hash));
 
 		// Step 3: Attempt to form an emergency committee with the conflicted member
-		let expert = account("expert", 3, 3);
-		setup_identity_for_account(expert.clone());
+		let expert = 3;
 		assign_ambassador_rank(expert.clone(), 3);
 
 		let members = vec![
 			(initiator.clone(), EmergencyRole::TechnicalLead),
 			(committee_member.clone(), EmergencyRole::GovernanceRepresentative), // Member with a conflict of interest
 			(expert.clone(), EmergencyRole::IndependentExpert),
-		].try_into().unwrap();
+		];
+		let bounded_members = BoundedVec::<_, _>::try_from(members).unwrap();
 
 		assert_noop!(
-			AmbassadorGovernance::form_emergency_committee(
+			AmbassadorGovernance::<Runtime>::form_emergency_committee(
 				RuntimeOrigin::signed(initiator.clone()),
 				emergency_id,
-				members
+				bounded_members
 			),
 			Error::<Runtime>::ConflictOfInterestDetected
 		);
@@ -2757,23 +2760,20 @@ fn register_conflict_of_interest_for_emergency_works() {
 fn register_disciplinary_action_works() {
 	new_test_ext().execute_with(|| {
 		// Setup
-		let issuer = account("issuer", 1, 1);
-		let subject = account("subject", 2, 2);
-
-		// Setup identity for issuer
-		setup_identity_for_account(issuer.clone());
+		let issuer = 4; // An account ID with sufficient rank in MockRankChecker
+		let subject = 2; // Any account ID rank
 
 		// Assign sufficient rank to issuer according to MinRankForDisciplinaryActionEnforcement
-		assign_ambassador_rank(issuer.clone(), 4);
+		assign_ambassador_rank(issuer, 4);
 
 		// Prepare disciplinary action parameters
 		let level = DisciplineLevel::Formal;
-		let reason = BoundedVec::try_from(b"Violation of code of conduct. Details at: ipfs://QmDisciplinaryEvidence123".to_vec()).unwrap();
+		let reason: BoundedVec<u8, <Runtime as crate::Config>::MaxJustificationLength> = BoundedVec::try_from(b"Violation of code of conduct. Details at: ipfs://QmDisciplinaryEvidence123".to_vec()).unwrap();
 		let duration = Some(100u64);
 		let evidence_hash = Some(sp_core::blake2_256("QmDisciplinaryEvidence123".as_bytes()).into());
 
 		// Register disciplinary action
-		assert_ok!(AmbassadorGovernance::register_disciplinary_action(
+		assert_ok!(AmbassadorGovernance::<Runtime>::register_disciplinary_action(
 			RuntimeOrigin::signed(issuer.clone()),
 			subject.clone(),
 			level.clone(),
@@ -2806,26 +2806,23 @@ fn register_disciplinary_action_works() {
 fn register_disciplinary_action_fails_with_insufficient_rank() {
 	new_test_ext().execute_with(|| {
 		// Setup
-		let low_rank_issuer = account("low_rank_issuer", 1, 1);
-		let subject = account("subject", 2, 2);
-
-		// Setup identity for issuer
-		setup_identity_for_account(low_rank_issuer.clone());
+		let low_rank_issuer = 1;
+		let subject = 2;
 
 		// Assign insufficient rank to issuer
 		assign_ambassador_rank(low_rank_issuer.clone(), 1);
 
 		// Prepare disciplinary action parameters
 		let level = DisciplineLevel::Formal;
-		let reason = BoundedVec::try_from(b"Violation of code of conduct. Details at: ipfs://QmDisciplinaryEvidence123".to_vec()).unwrap();
+		let reason: BoundedVec<u8, <Runtime as crate::Config>::MaxJustificationLength> = BoundedVec::try_from(b"Violation of code of conduct. Details at: ipfs://QmDisciplinaryEvidence123".to_vec()).unwrap();
 		let duration = Some(100u64);
 		let evidence_hash = Some(sp_core::blake2_256("QmDisciplinaryEvidence123".as_bytes()).into());
 
 		// Attempt to register disciplinary action should fail
 		assert_noop!(
-			AmbassadorGovernance::register_disciplinary_action(
-				RuntimeOrigin::signed(low_rank_issuer.clone()),
-				subject.clone(),
+			AmbassadorGovernance::<Runtime>::register_disciplinary_action(
+				RuntimeOrigin::signed(low_rank_issuer),
+				subject,
 				level.clone(),
 				reason.clone(),
 				duration,
@@ -2840,27 +2837,23 @@ fn register_disciplinary_action_fails_with_insufficient_rank() {
 fn resolve_disciplinary_action_works() {
 	new_test_ext().execute_with(|| {
 		// Setup
-		let issuer = account("issuer", 1, 1);
-		let resolver = account("resolver", 3, 3);
-		let subject = account("subject", 2, 2);
+		let issuer = 4; // An account ID with sufficient rank in MockRankChecker
+		let subject = 2; // Any account ID rank
+		let resolver = 4; // An account ID with sufficient rank in MockRankChecker
 
-		// Setup identities
-		setup_identity_for_account(issuer.clone());
-		setup_identity_for_account(resolver.clone());
-
-		// Assign sufficient ranks
-		assign_ambassador_rank(issuer.clone(), 4);
-		assign_ambassador_rank(resolver.clone(), 4);
+		// Assign ranks
+		assign_ambassador_rank(issuer, 4); // Sufficient for issuing
+		assign_ambassador_rank(resolver, 4);
 
 		// Prepare disciplinary action parameters
 		let level = DisciplineLevel::Formal;
-		let reason = BoundedVec::try_from(b"Violation of code of conduct. Details at: ipfs://QmDisciplinaryEvidence123".to_vec()).unwrap();
+		let reason: BoundedVec<u8, <Runtime as crate::Config>::MaxJustificationLength> = BoundedVec::try_from(b"Violation of code of conduct. Details at: ipfs://QmDisciplinaryEvidence123".to_vec()).unwrap();
 		let duration = Some(100u64);
 		let evidence_hash = Some(sp_core::blake2_256("QmDisciplinaryEvidence123".as_bytes()).into());
 
 		// Register disciplinary action
-		assert_ok!(AmbassadorGovernance::register_disciplinary_action(
-			RuntimeOrigin::signed(issuer.clone()),
+		assert_ok!(AmbassadorGovernance::<Runtime>::register_disciplinary_action(
+			RuntimeOrigin::signed(issuer),
 			subject.clone(),
 			level.clone(),
 			reason.clone(),
@@ -2881,7 +2874,7 @@ fn resolve_disciplinary_action_works() {
 		let resolution_evidence_hash = Some(sp_core::blake2_256("QmResolutionEvidence456".as_bytes()).into());
 
 		// Resolve the disciplinary action
-		assert_ok!(AmbassadorGovernance::resolve_disciplinary_action(
+		assert_ok!(AmbassadorGovernance::<Runtime>::resolve_disciplinary_action(
 			RuntimeOrigin::signed(resolver.clone()),
 			discipline_id,
 			resolution_summary.clone(),
@@ -2917,24 +2910,21 @@ fn resolve_disciplinary_action_works() {
 fn resolve_disciplinary_action_fails_for_nonexistent_action() {
 	new_test_ext().execute_with(|| {
 		// Setup
-		let resolver = account("resolver", 1, 1);
-
-		// Setup identity
-		setup_identity_for_account(resolver.clone());
+		let resolver = 4; // An account ID with sufficient rank in MockRankChecker
 
 		// Assign sufficient rank
-		assign_ambassador_rank(resolver.clone(), 4);
+		assign_ambassador_rank(resolver, 4);
 
 		// Create a random discipline_id that doesn't exist
 		let nonexistent_discipline_id = H256::random();
 
 		// Prepare resolution parameters
-		let resolution_summary = BoundedVec::try_from(b"Issue resolved through mediation. Details at: ipfs://QmResolutionEvidence456".to_vec()).unwrap();
+		let resolution_summary: BoundedVec<u8, <Runtime as crate::Config>::MaxResolutionLength> = BoundedVec::try_from(b"Issue resolved through mediation. Details at: ipfs://QmResolutionEvidence456".to_vec()).unwrap();
 		let resolution_evidence_hash = Some(sp_core::blake2_256("QmResolutionEvidence456".as_bytes()).into());
 
 		// Attempt to resolve a nonexistent disciplinary action should fail
 		assert_noop!(
-			AmbassadorGovernance::resolve_disciplinary_action(
+			AmbassadorGovernance::<Runtime>::resolve_disciplinary_action(
 				RuntimeOrigin::signed(resolver.clone()),
 				nonexistent_discipline_id,
 				resolution_summary.clone(),
@@ -2949,27 +2939,23 @@ fn resolve_disciplinary_action_fails_for_nonexistent_action() {
 fn resolve_disciplinary_action_fails_for_already_resolved_action() {
 	new_test_ext().execute_with(|| {
 		// Setup
-		let issuer = account("issuer", 1, 1);
-		let resolver = account("resolver", 3, 3);
-		let subject = account("subject", 2, 2);
-
-		// Setup identities
-		setup_identity_for_account(issuer.clone());
-		setup_identity_for_account(resolver.clone());
+		let issuer = 4; // An account ID with sufficient rank in MockRankChecker
+		let resolver = 4; // An account ID with sufficient rank in MockRankChecker
+		let subject = 2; // Any rank
 
 		// Assign ranks
-		assign_ambassador_rank(issuer.clone(), 4); // Sufficient for issuing
-		assign_ambassador_rank(resolver.clone(), 4);
+		assign_ambassador_rank(issuer, 4); // Sufficient for issuing
+		assign_ambassador_rank(resolver, 4);
 
 		// Register disciplinary action
 		let level = DisciplineLevel::Formal;
-		let reason = BoundedVec::try_from(b"Violation of code of conduct. Details at: ipfs://QmDisciplinaryEvidence123".to_vec()).unwrap();
+		let reason: BoundedVec<u8, <Runtime as crate::Config>::MaxJustificationLength> = BoundedVec::try_from(b"Violation of code of conduct. Details at: ipfs://QmDisciplinaryEvidence123".to_vec()).unwrap();
 		let duration = Some(100u64);
 		let evidence_hash = Some(sp_core::blake2_256("QmDisciplinaryEvidence123".as_bytes()).into());
 
-		assert_ok!(AmbassadorGovernance::register_disciplinary_action(
-			RuntimeOrigin::signed(issuer.clone()),
-			subject.clone(),
+		assert_ok!(AmbassadorGovernance::<Runtime>::register_disciplinary_action(
+			RuntimeOrigin::signed(issuer),
+			subject,
 			level.clone(),
 			reason.clone(),
 			duration,
@@ -2988,7 +2974,7 @@ fn resolve_disciplinary_action_fails_for_already_resolved_action() {
 		let resolution_summary = BoundedVec::try_from(b"Issue resolved through mediation. Details at: ipfs://QmResolutionEvidence456".to_vec()).unwrap();
 		let resolution_evidence_hash = Some(sp_core::blake2_256("QmResolutionEvidence456".as_bytes()).into());
 
-		assert_ok!(AmbassadorGovernance::resolve_disciplinary_action(
+		assert_ok!(AmbassadorGovernance::<Runtime>::resolve_disciplinary_action(
 			RuntimeOrigin::signed(resolver.clone()),
 			discipline_id,
 			resolution_summary.clone(),
@@ -2997,7 +2983,7 @@ fn resolve_disciplinary_action_fails_for_already_resolved_action() {
 
 		// Attempt to resolve the same disciplinary action again should fail
 		assert_noop!(
-			AmbassadorGovernance::resolve_disciplinary_action(
+			AmbassadorGovernance::<Runtime>::resolve_disciplinary_action(
 				RuntimeOrigin::signed(resolver.clone()),
 				discipline_id,
 				resolution_summary.clone(),
@@ -3012,27 +2998,23 @@ fn resolve_disciplinary_action_fails_for_already_resolved_action() {
 fn resolve_disciplinary_action_fails_with_insufficient_rank() {
 	new_test_ext().execute_with(|| {
 		// Setup
-		let issuer = account("issuer", 1, 1);
-		let low_rank_resolver = account("low_rank_resolver", 3, 3);
-		let subject = account("subject", 2, 2);
-
-		// Setup identities
-		setup_identity_for_account(issuer.clone());
-		setup_identity_for_account(low_rank_resolver.clone());
+		let issuer = 4; // An account ID with sufficient rank in MockRankChecker
+		let low_rank_resolver = 1; // An account ID with only rank 1 (insufficient) from MockRankChecker
+		let subject = 2; // Any account ID rank
 
 		// Assign ranks
-		assign_ambassador_rank(issuer.clone(), 4); // Sufficient for issuing
-		assign_ambassador_rank(low_rank_resolver.clone(), 1); // Insufficient for resolving
+		assign_ambassador_rank(issuer, 4); // Sufficient for issuing
+		assign_ambassador_rank(low_rank_resolver, 1); // Insufficient for resolving
 
 		// Register disciplinary action
 		let level = DisciplineLevel::Formal;
-		let reason = BoundedVec::try_from(b"Violation of code of conduct. Details at: ipfs://QmDisciplinaryEvidence123".to_vec()).unwrap();
+		let reason: BoundedVec<u8, <Runtime as crate::Config>::MaxJustificationLength> = BoundedVec::try_from(b"Violation of code of conduct. Details at: ipfs://QmDisciplinaryEvidence123".to_vec()).unwrap();
 		let duration = Some(100u64);
 		let evidence_hash = Some(sp_core::blake2_256("QmDisciplinaryEvidence123".as_bytes()).into());
 
-		assert_ok!(AmbassadorGovernance::register_disciplinary_action(
-			RuntimeOrigin::signed(issuer.clone()),
-			subject.clone(),
+		assert_ok!(AmbassadorGovernance::<Runtime>::register_disciplinary_action(
+			RuntimeOrigin::signed(issuer),
+			subject,
 			level.clone(),
 			reason.clone(),
 			duration,
@@ -3053,7 +3035,7 @@ fn resolve_disciplinary_action_fails_with_insufficient_rank() {
 
 		// Attempt to resolve with insufficient rank should fail
 		assert_noop!(
-			AmbassadorGovernance::resolve_disciplinary_action(
+			AmbassadorGovernance::<Runtime>::resolve_disciplinary_action(
 				RuntimeOrigin::signed(low_rank_resolver.clone()),
 				discipline_id,
 				resolution_summary.clone(),
@@ -3068,30 +3050,24 @@ fn resolve_disciplinary_action_fails_with_insufficient_rank() {
 fn form_appeal_committee_fails_with_conflict_of_interest() {
 	new_test_ext().execute_with(|| {
 		// Setup
-		let appellant = account("appellant", 2, 2);
-		let committee_member = account("committee_member", 3, 3);
-		let committee_organizer = account("organizer", 4, 4);
+		let appellant = 2;
+		let committee_member = 3;
+		let committee_organizer = 4;
 
-		// Set up identities
-		setup_identity_for_account(appellant.clone());
-		setup_identity_for_account(committee_member.clone());
-		setup_identity_for_account(committee_organizer.clone());
-
-		// Assign ranks
-		assign_ambassador_rank(appellant.clone(), 2);
-		assign_ambassador_rank(committee_member.clone(), 3);
-		assign_ambassador_rank(committee_organizer.clone(), 4);
+		// Assign ranks (identities are automatically verified for accounts 1-10)
+		assign_ambassador_rank(appellant, 2);
+		assign_ambassador_rank(committee_member, 3);
+		assign_ambassador_rank(committee_organizer, 4);
 
 		// Step 1: Submit an appeal
 		let original_decision = BoundedVec::try_from(b"Original decision that is being appealed. Evidence at: ipfs://QmOriginalDecision123".to_vec()).unwrap();
-		let justification = BoundedVec::try_from(b"Appeal justification. Evidence at: ipfs://QmAppealEvidence456".to_vec()).unwrap();
-		let evidence_hash = Some(sp_core::blake2_256("QmAppealEvidence456".as_bytes()).into());
+		let justification = BoundedVec::try_from(b"Appeal justification with evidence. Evidence at: ipfs://QmAppealEvidence456".to_vec()).unwrap();
 
 		assert_ok!(AmbassadorGovernance::<Runtime>::submit_appeal(
-			RuntimeOrigin::signed(appellant.clone()),
+			RuntimeOrigin::signed(appellant),
 			original_decision.clone(),
 			justification.clone(),
-			evidence_hash
+			None
 		));
 
 		// Get the appeal_id from events
@@ -3112,7 +3088,7 @@ fn form_appeal_committee_fails_with_conflict_of_interest() {
 		let conflict_evidence_hash = sp_core::blake2_256("QmConflictOfInterest123".as_bytes()).into();
 
 		assert_ok!(AmbassadorGovernance::<Runtime>::set_conflict_of_interest(
-			RuntimeOrigin::signed(committee_member.clone()),
+			RuntimeOrigin::signed(committee_member),
 			ConflictType::ProfessionalCritical,
 			description.clone(),
 			Some(relates_to_bounded.clone()),
@@ -3123,34 +3099,32 @@ fn form_appeal_committee_fails_with_conflict_of_interest() {
 		));
 
 		// Verify the conflict of interest was registered correctly
-		let conflict_id = match System::events().last().unwrap().event {
+		let nonce = match System::events().last().unwrap().event {
 			RuntimeEvent::AmbassadorGovernance(
-				Event::ConflictOfInterestSet { conflict_id, .. }
-			) => conflict_id,
+				Event::ConflictOfInterestSet { nonce, .. }
+			) => nonce,
 			_ => panic!("Expected ConflictOfInterestSet event"),
 		};
 
+		// Verify the conflict of interest details in storage
+		let conflict = Conflicts::<Runtime>::get((committee_member, ConflictType::ProfessionalCritical, nonce.unwrap_or(0))).unwrap();
+		assert_eq!(conflict.member, committee_member);
+		assert_eq!(conflict.conflict_type, ConflictType::ProfessionalCritical);
+		assert_eq!(conflict.description, description);
+		assert_eq!(conflict.relates_to, Some(relates_to_bounded));
+		assert_eq!(conflict.evidence_hash, Some(conflict_evidence_hash));
+
 		// Step 3: Attempt to form an appeal committee with the conflicted member
 		let members = vec![
-			(committee_member.clone(), 3), // Member with a conflict of interest
-			(account("member2", 3, 3), 3),
-			(account("member3", 3, 3), 3),
-		].try_into().unwrap();
-
-		// Set up identities for other members
-		setup_identity_for_account(members[1].clone());
-		setup_identity_for_account(members[2].clone());
-
-		// Assign ranks to other members
-		assign_ambassador_rank(members[1].clone(), 3);
-		assign_ambassador_rank(members[2].clone(), 3);
-
+				committee_member, // Member with a conflict of interest
+				5, // Use direct account IDs
+				6,
+		];
 		let bounded_members = BoundedVec::<_, _>::try_from(members).unwrap();
 
-		// Attempt to form the committee should fail due to conflict of interest
 		assert_noop!(
 			AmbassadorGovernance::<Runtime>::form_appeal_committee(
-				RuntimeOrigin::signed(committee_organizer.clone()),
+				RuntimeOrigin::signed(committee_organizer),
 				appeal_id,
 				bounded_members
 			),
@@ -3163,30 +3137,24 @@ fn form_appeal_committee_fails_with_conflict_of_interest() {
 fn form_appeal_committee_works_with_non_critical_conflict() {
 	new_test_ext().execute_with(|| {
 		// Setup
-		let appellant = account("appellant", 2, 2);
-		let committee_member = account("committee_member", 3, 3);
-		let committee_organizer = account("organizer", 4, 4);
+		let appellant = 2;
+		let committee_member = 3;
+		let committee_organizer = 4;
 
-		// Set up identities
-		setup_identity_for_account(appellant.clone());
-		setup_identity_for_account(committee_member.clone());
-		setup_identity_for_account(committee_organizer.clone());
-
-		// Assign ranks
-		assign_ambassador_rank(appellant.clone(), 2);
-		assign_ambassador_rank(committee_member.clone(), 3);
-		assign_ambassador_rank(committee_organizer.clone(), 4);
+		// Assign ranks (identities are automatically verified for accounts 1-10)
+		assign_ambassador_rank(appellant, 2);
+		assign_ambassador_rank(committee_member, 3);
+		assign_ambassador_rank(committee_organizer, 4);
 
 		// Step 1: Submit an appeal
 		let original_decision = BoundedVec::try_from(b"Original decision that is being appealed. Evidence at: ipfs://QmOriginalDecision123".to_vec()).unwrap();
-		let justification = BoundedVec::try_from(b"Appeal justification. Evidence at: ipfs://QmAppealEvidence456".to_vec()).unwrap();
-		let evidence_hash = Some(sp_core::blake2_256("QmAppealEvidence456".as_bytes()).into());
+		let justification = create_justification(100);
 
 		assert_ok!(AmbassadorGovernance::<Runtime>::submit_appeal(
-			RuntimeOrigin::signed(appellant.clone()),
+			RuntimeOrigin::signed(appellant),
 			original_decision.clone(),
 			justification.clone(),
-			evidence_hash
+			None
 		));
 
 		// Get the appeal_id from events
@@ -3207,7 +3175,7 @@ fn form_appeal_committee_works_with_non_critical_conflict() {
 		let conflict_evidence_hash = sp_core::blake2_256("QmConflictOfInterest456".as_bytes()).into();
 
 		assert_ok!(AmbassadorGovernance::<Runtime>::set_conflict_of_interest(
-			RuntimeOrigin::signed(committee_member.clone()),
+			RuntimeOrigin::signed(committee_member),
 			ConflictType::PersonalNonCritical, // Non-critical conflict
 			description.clone(),
 			Some(relates_to_bounded.clone()),
@@ -3218,26 +3186,28 @@ fn form_appeal_committee_works_with_non_critical_conflict() {
 		));
 
 		// Step 3: Form an appeal committee with the member who has a non-critical conflict
-		let members = vec![
-			(committee_member.clone(), 3), // Member with a NON-CRITICAL conflict of interest
+		let members_with_ranks: Vec<(u64, u32)> = vec![
+			(committee_member, 3), // Member with a NON-CRITICAL conflict of interest
 			(account("member2", 3, 3), 3),
 			(account("member3", 3, 3), 3),
-		].try_into().unwrap();
+		];
 
 		// Set up identities for other members
-		setup_identity_for_account(members[1].clone());
-		setup_identity_for_account(members[2].clone());
+		setup_identity_for_account(members_with_ranks[1].0.clone());
+		setup_identity_for_account(members_with_ranks[2].0.clone());
 
 		// Assign ranks to other members
-		assign_ambassador_rank(members[1].clone(), 3);
-		assign_ambassador_rank(members[2].clone(), 3);
+		assign_ambassador_rank(members_with_ranks[1].0.clone(), 3);
+		assign_ambassador_rank(members_with_ranks[2].0.clone(), 3);
 
+		// Extract just the account IDs for the committee
+		let members: Vec<u64> = members_with_ranks.iter().map(|(account_id, _)| account_id.clone()).collect();
 		let bounded_members = BoundedVec::<_, _>::try_from(members).unwrap();
 
 		// Committee formation should succeed but emit a warning event
 		assert_ok!(
 			AmbassadorGovernance::<Runtime>::form_appeal_committee(
-				RuntimeOrigin::signed(committee_organizer.clone()),
+				RuntimeOrigin::signed(committee_organizer),
 				appeal_id,
 				bounded_members.clone()
 			)

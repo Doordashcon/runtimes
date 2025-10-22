@@ -49,7 +49,6 @@ use sp_runtime::{
 	RuntimeDebug,
 };
 use sp_std::prelude::*;
-use sp_std::vec::Vec;
 
 /// Trait for verifying identity
 pub trait IdentityVerifier<AccountId> {
@@ -1867,27 +1866,27 @@ pub mod pallet {
 						&& conflict.relates_to.as_ref().map_or(false, |relates_to| {
 							relates_to.as_slice() == appeal_id_str.as_bytes()
 						}) {
-						// Determine if this is a critical conflict that prevents committee participation
-						if conflict_type.is_critical() {
-							// Critical conflict detected that prevents committee formation
-							Self::deposit_event(
-								Event::CriticalEmergencyConflictOfInterestDetected {
-									appeal_id,
-									member: account_id.clone(),
-									conflict_type: conflict_type.clone(),
-								},
-							);
-							return Err(Error::<T>::ConflictOfInterestDetected.into());
-						} else {
-							// Non-critical conflict so emit warning but allow committee formation
-							Self::deposit_event(
-								Event::NonCriticalEmergencyConflictOfInterestWarning {
-									appeal_id,
-									member: account_id.clone(),
-									conflict_type: conflict_type.clone(),
-								},
-							);
-						}
+							// Determine if this is a critical conflict that prevents committee participation
+							if conflict_type.is_critical() {
+								// Critical conflict detected that prevents committee formation
+								Self::deposit_event(
+									Event::CriticalAppealConflictDetected {
+										appeal_id,
+										member: account_id.clone(),
+										conflict_type: conflict_type.clone(),
+									},
+								);
+								return Err(Error::<T>::ConflictOfInterestDetected.into());
+							} else {
+								// Non-critical conflict so emit warning but allow committee formation
+								Self::deposit_event(
+									Event::NonCriticalAppealConflictWarning {
+										appeal_id,
+										member: account_id.clone(),
+										conflict_type: conflict_type.clone(),
+									},
+								);
+							}
 					}
 				}
 			}
@@ -2021,7 +2020,7 @@ pub mod pallet {
 				target_collective: target_collective.clone(),
 				description: description.clone(),
 				ambassador_participants: ambassador_participants.clone(),
-				target_participants,
+				target_participants: target_participants.clone(),
 				established_at: frame_system::Pallet::<T>::block_number().saturated_into(),
 				evidence_hash,
 			};
@@ -2085,7 +2084,7 @@ pub mod pallet {
 				target_collective,
 				description,
 				ambassador_participants,
-				target_participants,
+				target_participants: target_participants.clone(),
 				evidence_hash,
 				last_updated: frame_system::Pallet::<T>::block_number().saturated_into(),
 			});
