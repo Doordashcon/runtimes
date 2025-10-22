@@ -145,8 +145,8 @@ curl https://raw.githubusercontent.com/paritytech/polkadot-sdk/master/substrate/
 
 # Run from project root
 cargo check --features runtime-benchmarks -p pallet-ambassador-governance
-cargo check --features runtime-benchmarks -p pallet-ranked-collective-ambassador
-cargo check --features runtime-benchmarks -p pallet-core-fellowship-ambassador
+cargo check --features runtime-benchmarks -p pallet-ranked-collective
+cargo check --features runtime-benchmarks -p pallet-core-fellowship
 
 # Run build with feature flag
 cargo build --release --features runtime-benchmarks
@@ -173,14 +173,14 @@ cargo build --release -p pallet-ambassador-governance
 
 ```sh
 cargo fmt -p pallet-ambassador-governance --check
-cargo fmt -p pallet-ranked-collective-ambassador --check
-cargo fmt -p pallet-core-fellowship-ambassador --check
+cargo fmt -p pallet-ranked-collective --check
+cargo fmt -p pallet-core-fellowship --check
 
 # switch to nightly to lint
 rustup default nightly
 cargo fmt -p pallet-ambassador-governance
-cargo fmt -p pallet-ranked-collective-ambassador
-cargo fmt -p pallet-core-fellowship-ambassador
+cargo fmt -p pallet-ranked-collective
+cargo fmt -p pallet-core-fellowship
 rustup default stable
 ```
 

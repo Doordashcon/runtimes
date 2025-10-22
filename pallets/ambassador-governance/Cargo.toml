@@ -21,8 +21,8 @@ sp-std = { workspace = true }
 sp-io = { workspace = true }
 sp-core = { workspace = true }
 sp-weights = { workspace = true }
-pallet-ranked-collective-ambassador = { workspace = true }
-pallet-core-fellowship-ambassador = { optional = true, workspace = true }
+pallet-ranked-collective = { workspace = true }
+pallet-core-fellowship = { optional = true, workspace = true }
 
 [dev-dependencies]
 sp-core = { workspace = true }
@@ -41,8 +41,8 @@ std = [
 	"sp-runtime/std",
 	"sp-std/std",
 	"sp-io/std",
-	"pallet-ranked-collective-ambassador/std",
-	"pallet-core-fellowship-ambassador/std",
+	"pallet-ranked-collective/std",
+	"pallet-core-fellowship/std",
 ]
 runtime-benchmarks = [
 	"frame-benchmarking/runtime-benchmarks",

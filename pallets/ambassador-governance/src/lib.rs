@@ -41,7 +41,7 @@ use frame_support::{
 	BoundedVec,
 };
 use frame_system::{ensure_signed, pallet_prelude::*};
-use pallet_ranked_collective_ambassador::Rank;
+use pallet_ranked_collective::Rank;
 use scale_info::TypeInfo;
 use sp_core::H256;
 use sp_runtime::{

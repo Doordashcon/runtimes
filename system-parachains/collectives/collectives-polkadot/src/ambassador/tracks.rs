@@ -20,7 +20,7 @@ const fn percent(x: i32) -> sp_arithmetic::FixedI64 {
 }
 use crate::{Balance, BlockNumber, RuntimeOrigin, DAYS, DOLLARS, HOURS, MINUTES};
 use alloc::borrow::Cow;
-use pallet_ranked_collective_ambassador::Rank;
+use pallet_ranked_collective::Rank;
 use pallet_referenda::Curve;
 use sp_runtime::{str_array as s, traits::Convert, Perbill};
 
@@ -42,13 +42,11 @@ pub mod constants {
 	pub const RETAIN_AT_LEAD: TrackId = 12;
 	pub const RETAIN_AT_SENIOR: TrackId = 13;
 	pub const RETAIN_AT_PRINCIPAL: TrackId = 14;
-	pub const RETAIN_AT_GLOBAL: TrackId = 15; // this should be opengov vote
 
 	pub const PROMOTE_TO_ASSOCIATE: TrackId = 21;
 	pub const PROMOTE_TO_LEAD: TrackId = 22;
 	pub const PROMOTE_TO_SENIOR: TrackId = 23;
 	pub const PROMOTE_TO_PRINCIPAL: TrackId = 24;
-	pub const PROMOTE_TO_GLOBAL: TrackId = 25;
 
 	pub const FAST_PROMOTE_TO_ASSOCIATE: TrackId = 31;
 	pub const FAST_PROMOTE_TO_LEAD: TrackId = 32;
@@ -64,17 +62,17 @@ impl Convert<TrackId, Rank> for MinRankOfClass {
 		match a {
 			// Just a regular vote: the track ID is conveniently the same as the minimum rank.
 			regular @ 1..=6 => regular,
-			// A retention vote; the track ID turns out to be 8 more than the minimum required rank.
-			retention @ 11..=15 => retention - 8,
-			// A promotion vote; the track ID turns out to be 18 more than the minimum required
+			// A retention vote; the track ID turns out to be 9 more than the minimum required rank.
+			retention @ 11..=14 => retention - 9,
+			// A promotion vote; the track ID turns out to be 19 more than the minimum required
 			// rank.
-			promotion @ 21..=25 => promotion - 18,
+			promotion @ 21..=24 => promotion - 19,
 			// A fast promotion vote; the track ID turns out to be 28 more than the minimum required
 			// rank.
 			fast_promote @ 31..=33 => fast_promote - 28,
 			// Tipping Origin SeniorAmbassador
 			41 => 3,
-			// Treasurer Orirign GlobalAmbassador
+			// Treasurer Origin GlobalAmbassador
 			42 => 5,
 			_ => Rank::MAX,
 		}
@@ -146,15 +144,12 @@ pub struct TracksInfo;
 /// Information on the voting tracks.
 impl pallet_referenda::TracksInfo<Balance, BlockNumber> for TracksInfo {
 	type Id = TrackId;
-
 	type RuntimeOrigin = <RuntimeOrigin as frame_support::traits::OriginTrait>::PalletsOrigin;
-
-	/// Return the array of available tracks and their information.
 	fn tracks(
 	) -> impl Iterator<Item = Cow<'static, pallet_referenda::Track<Self::Id, Balance, BlockNumber>>>
 	{
 		use constants as tracks;
-		const DATA: [pallet_referenda::Track<TrackId, Balance, BlockNumber>; 21] = [
+		const DATA: [pallet_referenda::Track<TrackId, Balance, BlockNumber>; 19] = [
 			pallet_referenda::Track {
 				id: tracks::ASSOCIATE,
 				info: pallet_referenda::TrackInfo {
@@ -344,20 +339,6 @@ impl pallet_referenda::TracksInfo<Balance, BlockNumber> for TracksInfo {
 				},
 			},
 			pallet_referenda::Track {
-				id: tracks::RETAIN_AT_GLOBAL,
-				info: pallet_referenda::TrackInfo {
-					name: s("retain at global"),
-					max_deciding: RETAIN_MAX_DECIDING,
-					decision_deposit: RETAIN_DECISION_DEPOSIT,
-					prepare_period: RETAIN_PREPARE_PERIOD,
-					decision_period: RETAIN_DECISION_PERIOD,
-					confirm_period: RETAIN_CONFIRM_PERIOD,
-					min_enactment_period: RETAIN_MIN_ENACTMENT_PERIOD,
-					min_approval: RETAIN_MIN_APPROVAL,
-					min_support: RETAIN_MIN_SUPPORT,
-				},
-			},
-			pallet_referenda::Track {
 				id: tracks::PROMOTE_TO_ASSOCIATE,
 				info: pallet_referenda::TrackInfo {
 					name: s("promote to associate"),
@@ -403,20 +384,6 @@ impl pallet_referenda::TracksInfo<Balance, BlockNumber> for TracksInfo {
 				id: tracks::PROMOTE_TO_PRINCIPAL,
 				info: pallet_referenda::TrackInfo {
 					name: s("promote to principal"),
-					max_deciding: PROMOTE_MAX_DECIDING,
-					decision_deposit: PROMOTE_DECISION_DEPOSIT,
-					prepare_period: PROMOTE_PREPARE_PERIOD,
-					decision_period: PROMOTE_DECISION_PERIOD,
-					confirm_period: PROMOTE_CONFIRM_PERIOD,
-					min_enactment_period: PROMOTE_MIN_ENACTMENT_PERIOD,
-					min_approval: PROMOTE_MIN_APPROVAL,
-					min_support: PROMOTE_MIN_SUPPORT,
-				},
-			},
-			pallet_referenda::Track {
-				id: tracks::PROMOTE_TO_GLOBAL,
-				info: pallet_referenda::TrackInfo {
-					name: s("promote to global"),
 					max_deciding: PROMOTE_MAX_DECIDING,
 					decision_deposit: PROMOTE_DECISION_DEPOSIT,
 					prepare_period: PROMOTE_PREPARE_PERIOD,
@@ -474,7 +441,7 @@ impl pallet_referenda::TracksInfo<Balance, BlockNumber> for TracksInfo {
 				info: pallet_referenda::TrackInfo {
 					name: s("tip"),
 					max_deciding: 200,
-					decision_deposit: DOLLARS * 10, // 1 DOT
+					decision_deposit: DOLLARS * 10,
 					prepare_period: MINUTES,
 					decision_period: 7 * DAYS,
 					confirm_period: 10 * MINUTES,
@@ -488,7 +455,7 @@ impl pallet_referenda::TracksInfo<Balance, BlockNumber> for TracksInfo {
 				info: pallet_referenda::TrackInfo {
 					name: s("treasurer"),
 					max_deciding: 10,
-					decision_deposit: DOLLARS, // 1,000 DOT
+					decision_deposit: DOLLARS,
 					prepare_period: 2 * HOURS,
 					decision_period: 28 * DAYS,
 					confirm_period: 7 * DAYS,
@@ -501,7 +468,6 @@ impl pallet_referenda::TracksInfo<Balance, BlockNumber> for TracksInfo {
 		DATA.iter().map(Cow::Borrowed)
 	}
 
-	/// Determine the voting track for the given `origin`.
 	fn track_for(id: &Self::RuntimeOrigin) -> Result<Self::Id, ()> {
 		use super::origins::Origin;
 		use constants as tracks;
@@ -517,26 +483,26 @@ impl pallet_referenda::TracksInfo<Balance, BlockNumber> for TracksInfo {
 		}
 
 		match Origin::try_from(id.clone()) {
-			Ok(Origin::AssociateAmbassador) => Ok(tracks::ASSOCIATE),
-			Ok(Origin::LeadAmbassador) => Ok(tracks::LEAD),
-			Ok(Origin::SeniorAmbassador) => Ok(tracks::SENIOR),
-			Ok(Origin::PrincipalAmbassador) => Ok(tracks::PRINCIPAL),
-			Ok(Origin::GlobalAmbassador) => Ok(tracks::GLOBAL),
-			Ok(Origin::GlobalHeadAmbassador) => Ok(tracks::GLOBAL_HEAD),
+			Ok(Origin::Associate) => Ok(tracks::ASSOCIATE),
+			Ok(Origin::Lead) => Ok(tracks::LEAD),
+			Ok(Origin::Senior) => Ok(tracks::SENIOR),
+			Ok(Origin::Principal) => Ok(tracks::PRINCIPAL),
+			Ok(Origin::Global) => Ok(tracks::GLOBAL),
+			Ok(Origin::GlobalHead) => Ok(tracks::GLOBAL_HEAD),
 
-			Ok(Origin::RetainAtAssociateAmbassador) => Ok(tracks::RETAIN_AT_ASSOCIATE),
-			Ok(Origin::RetainAtLeadAmbassador) => Ok(tracks::RETAIN_AT_LEAD),
-			Ok(Origin::RetainAtSeniorAmbassador) => Ok(tracks::RETAIN_AT_SENIOR),
-			Ok(Origin::RetainAtPrincipalAmbassador) => Ok(tracks::RETAIN_AT_PRINCIPAL),
+			Ok(Origin::RetainAtAssociate) => Ok(tracks::RETAIN_AT_ASSOCIATE),
+			Ok(Origin::RetainAtLead) => Ok(tracks::RETAIN_AT_LEAD),
+			Ok(Origin::RetainAtSenior) => Ok(tracks::RETAIN_AT_SENIOR),
+			Ok(Origin::RetainAtPrincipal) => Ok(tracks::RETAIN_AT_PRINCIPAL),
 
-			Ok(Origin::PromoteToAssociateAmbassador) => Ok(tracks::PROMOTE_TO_ASSOCIATE),
-			Ok(Origin::PromoteToLeadAmbassador) => Ok(tracks::PROMOTE_TO_LEAD),
-			Ok(Origin::PromoteToSeniorAmbassador) => Ok(tracks::PROMOTE_TO_SENIOR),
-			Ok(Origin::PromoteToPrincipalAmbassador) => Ok(tracks::PROMOTE_TO_PRINCIPAL),
+			Ok(Origin::PromoteToAssociate) => Ok(tracks::PROMOTE_TO_ASSOCIATE),
+			Ok(Origin::PromoteToLead) => Ok(tracks::PROMOTE_TO_LEAD),
+			Ok(Origin::PromoteToSenior) => Ok(tracks::PROMOTE_TO_SENIOR),
+			Ok(Origin::PromoteToPrincipal) => Ok(tracks::PROMOTE_TO_PRINCIPAL),
 
-			Ok(Origin::FastPromoteToAssociateAmbassador) => Ok(tracks::FAST_PROMOTE_TO_ASSOCIATE),
-			Ok(Origin::FastPromoteToLeadAmbassador) => Ok(tracks::FAST_PROMOTE_TO_LEAD),
-			Ok(Origin::FastPromoteToSeniorAmbassador) => Ok(tracks::FAST_PROMOTE_TO_SENIOR),
+			Ok(Origin::FastPromoteToAssociate) => Ok(tracks::FAST_PROMOTE_TO_ASSOCIATE),
+			Ok(Origin::FastPromoteToLead) => Ok(tracks::FAST_PROMOTE_TO_LEAD),
+			Ok(Origin::FastPromoteToSenior) => Ok(tracks::FAST_PROMOTE_TO_SENIOR),
 
 			Ok(Origin::Tip) => Ok(tracks::TIP),
 			Ok(Origin::Treasurer) => Ok(tracks::TREASURER),

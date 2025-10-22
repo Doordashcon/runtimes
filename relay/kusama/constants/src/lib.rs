@@ -110,6 +110,7 @@ pub mod system_parachain {
 
 	parameter_types! {
 		pub AssetHubParaId: ParaId = ASSET_HUB_ID.into();
+		pub PeopleParaId: ParaId = PEOPLE_ID.into();
 	}
 
 	/// Asset Hub parachain ID.
@@ -263,6 +264,15 @@ pub mod proxy {
 				root,
 			)
 		}
+	}
+}
+
+/// XCM protocol related constants.
+pub mod xcm {
+	/// Pluralistic bodies existing within the consensus.
+	pub mod body {
+		// The body corresponding to the Kusama OpenGov FellowshipAdmin Origin.
+		pub const FELLOWSHIP_ADMIN_INDEX: u32 = 1;
 	}
 }
 
