@@ -146,21 +146,24 @@ pub enum EmergencySeverity {
 	/// Critical emergencies pose an existential threat to the collective or network
 	/// and require immediate response within hours.
 	///
-	/// Examples: Active exploits, significant fund loss, or severe reputation damage already occurring.
+	/// Examples: Active exploits, significant fund loss, or severe reputation damage already
+	/// occurring.
 	Critical,
 	/// High requires expedited approval
 	///
 	/// High severity emergencies represent significant threats that require
 	/// expedited response within 1-2 days.
 	///
-	/// Examples: Vulnerabilities with high likelihood of exploitation or substantial impact if exploited.
+	/// Examples: Vulnerabilities with high likelihood of exploitation or substantial impact if
+	/// exploited.
 	High,
 	/// Medium follows standard approval process
 	///
 	/// Medium severity emergencies follow the standard approval process with
 	/// response times of several days.
 	///
-	/// Examples: Important but non-critical issues that can be addressed through normal governance procedures.
+	/// Examples: Important but non-critical issues that can be addressed through normal governance
+	/// procedures.
 	Medium,
 }
 
@@ -245,17 +248,18 @@ pub enum IntegrationMechanism {
 	/// Joint Governance Council: Formal council with members from both collectives
 	///
 	/// Example: Council with certain number of Ambassador Fellows and Technical Fellows that meets
-	/// at a certain interval to coordinate on technical governance decisions affecting both collectives.
+	/// at a certain interval to coordinate on technical governance decisions affecting both
+	/// collectives.
 	JointGovernanceCouncil,
 	/// Liaison System: Designated points of contact between collectives
 	///
-	/// Example: Certain number of Ambassador Fellows serving as liaisons to the Technical Fellowship,
-	/// attending their meetings and facilitating regular communication channels.
+	/// Example: Certain number of Ambassador Fellows serving as liaisons to the Technical
+	/// Fellowship, attending their meetings and facilitating regular communication channels.
 	LiaisonSystem,
 	/// Integrated Planning Cycles: Synchronized roadmaps and planning processes
 	///
-	/// Example: Certain number of Ambassador Fellows and Technical Fellows synchronizing quarterly planning
-	/// with joint kickoff sessions and regular alignment check-ins.
+	/// Example: Certain number of Ambassador Fellows and Technical Fellows synchronizing quarterly
+	/// planning with joint kickoff sessions and regular alignment check-ins.
 	IntegratedPlanningCycles,
 }
 
@@ -481,8 +485,8 @@ pub enum ConflictType {
 	FinancialCritical,
 	/// Professional relationship with involved parties (Critical)
 	///
-	/// Member has a professional relationship with individuals or organizations affected by a decision.
-	/// This is considered a critical conflict for committee participation.
+	/// Member has a professional relationship with individuals or organizations affected by a
+	/// decision. This is considered a critical conflict for committee participation.
 	ProfessionalCritical,
 	/// Personal relationship with involved parties (Non-critical)
 	///
@@ -631,8 +635,8 @@ pub struct ConflictRegistration<
 	/// Description of the conflict, must include the location
 	/// where any off-chain evidence is stored for future reference
 	pub description: BoundedDescription,
-	/// Related matter or decision that can be an extrinsic hash, emergency ID, appeal ID, or any other
-	/// on-chain identifier that this conflict relates to. If the conflict is general,
+	/// Related matter or decision that can be an extrinsic hash, emergency ID, appeal ID, or any
+	/// other on-chain identifier that this conflict relates to. If the conflict is general,
 	/// this should contain a clear description of the scope of the conflict.
 	pub relates_to: Option<BoundedRelatesTo>,
 	/// Block when conflict was registered
@@ -656,8 +660,8 @@ pub struct OnChainRemark<BlockNumber, ContentBound> {
 	/// Content of the remark must include the location where any off-chain evidence
 	/// (referenced by the `evidence_hash`) is stored for future reference and auditability
 	pub content: ContentBound,
-	/// Evidence hash (if applicable) where actual evidence is stored off-chain and its location should be
-	/// referenced in the `content` field
+	/// Evidence hash (if applicable) where actual evidence is stored off-chain and its location
+	/// should be referenced in the `content` field
 	pub evidence_hash: Option<H256>,
 	/// Block when remark was last updated
 	pub last_updated: BlockNumber,
@@ -665,7 +669,8 @@ pub struct OnChainRemark<BlockNumber, ContentBound> {
 
 /// Professional service type
 ///
-/// Defines the types of professional services that are outside the scope of Ambassador Fellowship duties.
+/// Defines the types of professional services that are outside the scope of Ambassador Fellowship
+/// duties.
 #[derive(
 	Encode,
 	Decode,
@@ -708,7 +713,8 @@ pub struct ServiceProviderDetails<
 	provider_account: AccountId,
 	/// Service types offered
 	service_types: ServiceTypesBoundedVec,
-	/// Evidence information (references to off-chain evidence supporting the provider's credentials)
+	/// Evidence information (references to off-chain evidence supporting the provider's
+	/// credentials)
 	evidence_info: EvidenceInfoBoundedString,
 	/// Optional hash of evidence supporting the provider's credentials
 	/// where the actual evidence is stored off-chain, and its location should be
@@ -738,7 +744,8 @@ pub struct ServiceReferral<
 	service_types: ServiceTypesBoundedVec,
 	/// Description of the referral
 	description: DescriptionBoundedString,
-	/// Whether the referrer disclosed receiving compensation for this referral (transparency requirement)
+	/// Whether the referrer disclosed receiving compensation for this referral (transparency
+	/// requirement)
 	compensation_disclosed: bool,
 	/// Description of compensation received by referrer for this referral (if any)
 	compensation_details: Option<CompensationDetailsBoundedString>,
@@ -1179,8 +1186,8 @@ pub mod pallet {
 		IntegrationEstablished {
 			/// Unique identifier for the integration, derived from the integration details
 			integration_id: T::Hash,
-			/// Integration mechanism type that was established (e.g. JointGovernanceCouncil, LiaisonSystem,
-			/// or IntegratedPlanningCycles)
+			/// Integration mechanism type that was established (e.g. JointGovernanceCouncil,
+			/// LiaisonSystem, or IntegratedPlanningCycles)
 			mechanism: IntegrationMechanism,
 			/// Collective being integrated with
 			target_collective: TargetCollective,
@@ -1312,7 +1319,8 @@ pub mod pallet {
 			service_types: BoundedVec<ProfessionalServiceType, T::MaxServiceTypes>,
 			/// Description of the referral
 			description: BoundedVec<u8, T::MaxDescriptionLength>,
-			/// Whether the referrer disclosed receiving compensation for this referral (transparency requirement)
+			/// Whether the referrer disclosed receiving compensation for this referral
+			/// (transparency requirement)
 			compensation_disclosed: bool,
 			/// Optional details of compensation if disclosed
 			compensation_details: Option<BoundedVec<u8, T::MaxCompensationDetailsLength>>,
@@ -1391,8 +1399,8 @@ pub mod pallet {
 		/// Parameters:
 		/// - `emergency_type`: Emergency type being declared
 		/// - `severity`: Severity level of the emergency
-		/// - `justification`: Justification for declaring the emergency, should include the location
-		///   where any off-chain evidence is stored for future reference
+		/// - `justification`: Justification for declaring the emergency, should include the
+		///   location where any off-chain evidence is stored for future reference
 		/// - `evidence_hash`: Optional hash of evidence supporting the emergency declaration
 		///
 		/// Emits `EmergencyActivated` event when successful.
@@ -1498,12 +1506,14 @@ pub mod pallet {
 						Error::<T>::TooManyConflictOfInterestChecks
 					);
 
-					// Check if this conflict of interest belongs to a committee member and relates to this emergency
-					if account_id == *member
-						&& conflict.relates_to.as_ref().map_or(false, |relates_to| {
+					// Check if this conflict of interest belongs to a committee member and relates
+					// to this emergency
+					if account_id == *member &&
+						conflict.relates_to.as_ref().map_or(false, |relates_to| {
 							relates_to.as_slice() == emergency_id_str.as_bytes()
 						}) {
-						// Use the IsConflictCritical trait to determine if this is a critical conflict
+						// Use the IsConflictCritical trait to determine if this is a critical
+						// conflict
 						if conflict_type.is_critical() {
 							// Critical conflict detected that prevents committee formation
 							Self::deposit_event(
@@ -1515,7 +1525,8 @@ pub mod pallet {
 							);
 							return Err(Error::<T>::ConflictOfInterestDetected.into());
 						} else {
-							// Non-critical conflict detected that emits warning but allows committee formation
+							// Non-critical conflict detected that emits warning but allows
+							// committee formation
 							Self::deposit_event(
 								Event::NonCriticalEmergencyConflictOfInterestWarning {
 									emergency_id,
@@ -1578,7 +1589,8 @@ pub mod pallet {
 			// Check that the caller has a verified identity
 			ensure!(T::IdentityRegistrar::has_identity(&who), Error::<T>::IdentityNotVerified);
 
-			// Ensure the caller has at least the minimum rank required for emergency response authority
+			// Ensure the caller has at least the minimum rank required for emergency response
+			// authority
 			ensure!(
 				T::RankChecker::has_minimum_rank(
 					&who,
@@ -1623,17 +1635,18 @@ pub mod pallet {
 		/// Register disciplinary action
 		///
 		/// Allows authorized users to register taking disciplinary action against a member.
-		/// This extrinsic only documents the disciplinary action for governance transparency and accountability.
+		/// This extrinsic only documents the disciplinary action for governance transparency and
+		/// accountability.
 		///
 		/// Parameters:
 		/// - `subject`: Account ID of the member to be disciplined
 		/// - `level`: Level of discipline to be applied
-		/// - `reason`: Reason for the disciplinary action, must include the location
-		///   where any off-chain evidence (referenced by the `evidence_hash`) is stored
+		/// - `reason`: Reason for the disciplinary action, must include the location where any
+		///   off-chain evidence (referenced by the `evidence_hash`) is stored
 		/// - `duration`: Duration of the disciplinary action (if applicable)
-		/// - `evidence_hash`: Optional hash of evidence supporting the disciplinary action.
-		///   The actual evidence is stored off-chain, and its location should be
-		///   referenced in the reason field
+		/// - `evidence_hash`: Optional hash of evidence supporting the disciplinary action. The
+		///   actual evidence is stored off-chain, and its location should be referenced in the
+		///   reason field
 		///
 		/// Emits `DisciplinaryActionRegistered` event when successful.
 		#[pallet::call_index(7)]
@@ -1687,14 +1700,14 @@ pub mod pallet {
 
 		/// Resolve disciplinary action
 		///
-		/// Allows authorized users to resolve a disciplinary action, setting its active status to false.
-		/// This follows the Progressive Enforcement pattern from the Ambassador Fellowship Manifesto,
-		/// providing a remediation path for correction.
+		/// Allows authorized users to resolve a disciplinary action, setting its active status to
+		/// false. This follows the Progressive Enforcement pattern from the Ambassador Fellowship
+		/// Manifesto, providing a remediation path for correction.
 		///
 		/// Parameters:
 		/// - `discipline_id`: ID of the disciplinary action to resolve
-		/// - `resolution_summary`: Summary of the resolution, should include the location
-		///   where any off-chain evidence is stored for future reference
+		/// - `resolution_summary`: Summary of the resolution, should include the location where any
+		///   off-chain evidence is stored for future reference
 		/// - `evidence_hash`: Optional hash of evidence supporting the resolution
 		///
 		/// Emits `DisciplinaryActionResolved` event when successful.
@@ -1763,8 +1776,8 @@ pub mod pallet {
 		///
 		/// Parameters:
 		/// - `original_decision`: Description of the original decision being appealed
-		/// - `justification`: Justification for the appeal, should include the location
-		///   where any off-chain evidence is stored for future reference
+		/// - `justification`: Justification for the appeal, should include the location where any
+		///   off-chain evidence is stored for future reference
 		/// - `evidence_hash`: Optional hash of evidence supporting the appeal
 		///
 		/// Emits `AppealSubmitted` event when successful.
@@ -1861,32 +1874,30 @@ pub mod pallet {
 						Error::<T>::TooManyConflictOfInterestChecks
 					);
 
-					// Check if this conflict belongs to a committee member and relates to this appeal
-					if account_id == *member
-						&& conflict.relates_to.as_ref().map_or(false, |relates_to| {
+					// Check if this conflict belongs to a committee member and relates to this
+					// appeal
+					if account_id == *member &&
+						conflict.relates_to.as_ref().map_or(false, |relates_to| {
 							relates_to.as_slice() == appeal_id_str.as_bytes()
 						}) {
-							// Determine if this is a critical conflict that prevents committee participation
-							if conflict_type.is_critical() {
-								// Critical conflict detected that prevents committee formation
-								Self::deposit_event(
-									Event::CriticalAppealConflictDetected {
-										appeal_id,
-										member: account_id.clone(),
-										conflict_type: conflict_type.clone(),
-									},
-								);
-								return Err(Error::<T>::ConflictOfInterestDetected.into());
-							} else {
-								// Non-critical conflict so emit warning but allow committee formation
-								Self::deposit_event(
-									Event::NonCriticalAppealConflictWarning {
-										appeal_id,
-										member: account_id.clone(),
-										conflict_type: conflict_type.clone(),
-									},
-								);
-							}
+						// Determine if this is a critical conflict that prevents committee
+						// participation
+						if conflict_type.is_critical() {
+							// Critical conflict detected that prevents committee formation
+							Self::deposit_event(Event::CriticalAppealConflictDetected {
+								appeal_id,
+								member: account_id.clone(),
+								conflict_type: conflict_type.clone(),
+							});
+							return Err(Error::<T>::ConflictOfInterestDetected.into());
+						} else {
+							// Non-critical conflict so emit warning but allow committee formation
+							Self::deposit_event(Event::NonCriticalAppealConflictWarning {
+								appeal_id,
+								member: account_id.clone(),
+								conflict_type: conflict_type.clone(),
+							});
+						}
 					}
 				}
 			}
@@ -1912,7 +1923,8 @@ pub mod pallet {
 		/// Parameters:
 		/// - `appeal_id`: ID of the appeal
 		/// - `decision`: Decision on the appeal
-		/// - `justification`: Justification for the decision (includes reference to off-chain evidence)
+		/// - `justification`: Justification for the decision (includes reference to off-chain
+		///   evidence)
 		/// - `evidence_hash`: Hash of evidence supporting the decision
 		///
 		/// Emits `AppealDecided` event when successful.
@@ -1973,24 +1985,28 @@ pub mod pallet {
 		/// - `mechanism`: Integration mechanism defining how the collectives will work together.
 		///   Determines the governance structure and operational model of the integration.
 		/// - `target_collective`: Target collective to integrate with
-		/// - `description`: Description of the integration purpose, objectives, and scope.
-		///   Should include the location where any off-chain agreement is stored for future reference.
-		/// - `ambassador_participants`: List of Ambassador Fellowship participants who will be involved
-		///   in the integration activities and governance.
+		/// - `description`: Description of the integration purpose, objectives, and scope. Should
+		///   include the location where any off-chain agreement is stored for future reference.
+		/// - `ambassador_participants`: List of Ambassador Fellowship participants who will be
+		///   involved in the integration activities and governance.
 		/// - `target_participants`: List of participants from the target collective who will be
 		///   collaborating with the Ambassador Fellowship.
 		/// - `evidence_hash`: Optional evidence hash of the formal integration agreement document.
-		///   Creates an on-chain reference to the off-chain legal or governance document when provided.
-		///   Storage location of this document should be specified in the `description` parameter.
+		///   Creates an on-chain reference to the off-chain legal or governance document when
+		///   provided. Storage location of this document should be specified in the `description`
+		///   parameter.
 		///
 		/// Emits `IntegrationEstablished` event when successful.
 		///
 		/// # Examples
 		///
-		/// - Joint Working Group: Create a working group between Ambassador Fellowship and Technical Fellowship
-		/// - Liaison System: Establish liaisons between Ambassador Fellowship and Secretary Collective
+		/// - Joint Working Group: Create a working group between Ambassador Fellowship and
+		///   Technical Fellowship
+		/// - Liaison System: Establish liaisons between Ambassador Fellowship and Secretary
+		///   Collective
 		/// - Integrated Planning: Create joint planning cycles with other collectives
-		/// - Knowledge Sharing: Establish knowledge sharing between Ambassador Fellowship and other collectives
+		/// - Knowledge Sharing: Establish knowledge sharing between Ambassador Fellowship and other
+		///   collectives
 		#[pallet::call_index(12)]
 		#[pallet::weight(T::WeightInfo::establish_integration())]
 		pub fn establish_integration(
@@ -2049,12 +2065,14 @@ pub mod pallet {
 						Error::<T>::TooManyConflictOfInterestChecks
 					);
 
-					// Check if this conflict belongs to a participant and relates to this integration
-					if account_id == *participant
-						&& conflict.relates_to.as_ref().map_or(false, |relates_to| {
+					// Check if this conflict belongs to a participant and relates to this
+					// integration
+					if account_id == *participant &&
+						conflict.relates_to.as_ref().map_or(false, |relates_to| {
 							relates_to.as_slice() == integration_id_str.as_bytes()
 						}) {
-						// Use the IsConflictCritical trait to determine if this is a critical conflict
+						// Use the IsConflictCritical trait to determine if this is a critical
+						// conflict
 						if conflict_type.is_critical() {
 							// Critical conflict detected that prevents integration establishment
 							Self::deposit_event(Event::CriticalIntegrationConflictDetected {
@@ -2064,7 +2082,8 @@ pub mod pallet {
 							});
 							return Err(Error::<T>::ConflictOfInterestDetected.into());
 						} else {
-							// Non-critical conflict detected that emits warning but allows integration
+							// Non-critical conflict detected that emits warning but allows
+							// integration
 							Self::deposit_event(Event::NonCriticalIntegrationConflictWarning {
 								integration_id,
 								member: account_id.clone(),
@@ -2094,28 +2113,29 @@ pub mod pallet {
 
 		/// Record rank transition
 		///
-		/// Allows authorized users to record the intent for a rank transition for a member, but does NOT actually execute the rank change.
-		/// This extrinsic only documents the transition for governance transparency and accountability.
+		/// Allows authorized users to record the intent for a rank transition for a member, but
+		/// does NOT actually execute the rank change. This extrinsic only documents the
+		/// transition for governance transparency and accountability.
 		///
-		/// IMPORTANT: This function only records the transition details on-chain. The actual rank change must be
-		/// executed separately using the appropriate mechanism:
-		/// - For standard promotions and demotions, use the `promote_member` and `demote_member` extrinsics
-		///   from the ranked-collective-ambassador pallet
-		/// - For complex transitions recorded with this extrinsic, a manual process must be followed to
-		///   execute the actual rank change once the `effective_at` block is reached
+		/// IMPORTANT: This function only records the transition details on-chain. The actual rank
+		/// change must be executed separately using the appropriate mechanism:
+		/// - For standard promotions and demotions, use the `promote_member` and `demote_member`
+		///   extrinsics from the ranked-collective-ambassador pallet
+		/// - For complex transitions recorded with this extrinsic, a manual process must be
+		///   followed to execute the actual rank change once the `effective_at` block is reached
 		///
 		/// Parameters:
 		/// - `member`: Account ID of the member undergoing transition
 		/// - `transition_type`: Type of transition
 		/// - `previous_rank`: Previous rank of the member
 		/// - `new_rank`: New rank of the member
-		/// - `justification`: Justification for the transition, must include the location
-		///   where any off-chain evidence or documentation is stored for future reference
+		/// - `justification`: Justification for the transition, must include the location where any
+		///   off-chain evidence or documentation is stored for future reference
 		/// - `effective_at`: Block when the transition will be completed
 		/// - `successor`: Successor account (if applicable)
-		/// - `evidence_hash`: Optional hash of the evidence supporting this transition.
-		///   The actual evidence is stored off-chain, and its location should be
-		///   referenced in the `justification` field
+		/// - `evidence_hash`: Optional hash of the evidence supporting this transition. The actual
+		///   evidence is stored off-chain, and its location should be referenced in the
+		///   `justification` field
 		///
 		/// Emits `RankTransitionRegistered` event when successful.
 		#[pallet::call_index(13)]
@@ -2140,7 +2160,8 @@ pub mod pallet {
 				Error::<T>::IdentityNotVerified
 			);
 
-			// Ensure the caller has at least the minimum rank required for role fulfillment contingency
+			// Ensure the caller has at least the minimum rank required for role fulfillment
+			// contingency
 			ensure!(
 				T::RankChecker::has_minimum_rank(
 					&initiator,
@@ -2185,10 +2206,11 @@ pub mod pallet {
 		///
 		/// Parameters:
 		/// - `conflict_type`: Type of conflict
-		/// - `description`: Description of the conflict, should include the location
-		///   where any off-chain evidence is stored for future reference
+		/// - `description`: Description of the conflict, should include the location where any
+		///   off-chain evidence is stored for future reference
 		/// - `relates_to`: Optionally the related matter or decision
-		/// - `start_block`: Optionally the block when conflict starts otherwise the current block used
+		/// - `start_block`: Optionally the block when conflict starts otherwise the current block
+		///   used
 		/// - `end_block`: Optionally the block when conflict expires (if applicable)
 		/// - `evidence_hash`: Optional hash of evidence supporting the conflict declaration
 		/// - `nonce`: Optionally the nonce for tracking updates
@@ -2278,16 +2300,17 @@ pub mod pallet {
 
 		/// Create or update an on-chain remark
 		///
-		/// Allows authorized users to create or update on-chain remarks for governance transparency.
-		/// If a remark with the same author, category, and optionally provided nonce already exists, it will be updated.
+		/// Allows authorized users to create or update on-chain remarks for governance
+		/// transparency. If a remark with the same author, category, and optionally provided
+		/// nonce already exists, it will be updated.
 		///
 		/// Parameters:
 		/// - `category`: Category of the remark
-		/// - `content`: Content of the remark, must include the location
-		///   where any off-chain evidence (referenced by the `evidence_hash`) is stored
-		///   for future reference and auditability
-		/// - `evidence_hash`: Optional hash of evidence supporting the remark. The actual evidence is stored
-		///   off-chain, and its location should be referenced in the `content` field
+		/// - `content`: Content of the remark, must include the location where any off-chain
+		///   evidence (referenced by the `evidence_hash`) is stored for future reference and
+		///   auditability
+		/// - `evidence_hash`: Optional hash of evidence supporting the remark. The actual evidence
+		///   is stored off-chain, and its location should be referenced in the `content` field
 		/// - `nonce`: Optional to update a specific nonce
 		///
 		/// Emits `RemarkSet` event when successful.
@@ -2359,20 +2382,20 @@ pub mod pallet {
 		/// Allows authorized users to set governance health metrics.
 		///
 		/// Parameters:
-		/// - `participation_rate`: Participation rate (0-100%) percentage of eligible
-		///   members who participated in governance activities
+		/// - `participation_rate`: Participation rate (0-100%) percentage of eligible members who
+		///   participated in governance activities
 		/// - `vote_concentration`: Vote concentration index (0-100%) measures how concentrated
-		///   voting power is among participants. Lower values indicate more equal distribution
-		///   of votes, while higher values indicate votes are concentrated among fewer participants
-		/// - `avg_response_time`: Average response time in blocks is the average time taken
-		///   to respond to governance actions
+		///   voting power is among participants. Lower values indicate more equal distribution of
+		///   votes, while higher values indicate votes are concentrated among fewer participants
+		/// - `avg_response_time`: Average response time in blocks is the average time taken to
+		///   respond to governance actions
 		/// - `start_block`: Starting block number of the period these metrics cover
 		/// - `end_block`: Ending block number of the period these metrics cover
-		/// - `evidence_info`: Evidence information, must include the location
-		///   where any off-chain evidence is stored for future reference and auditability
-		/// - `evidence_hash`: Optional hash of the evidence supporting the reported metrics.
-		///   The actual evidence is stored off-chain, and its location should be
-		///   referenced in the evidence_info field
+		/// - `evidence_info`: Evidence information, must include the location where any off-chain
+		///   evidence is stored for future reference and auditability
+		/// - `evidence_hash`: Optional hash of the evidence supporting the reported metrics. The
+		///   actual evidence is stored off-chain, and its location should be referenced in the
+		///   evidence_info field
 		///
 		/// Emits `GovernanceHealthMetricsSet` event when successful.
 		#[pallet::call_index(16)]
@@ -2429,12 +2452,12 @@ pub mod pallet {
 		/// Parameters:
 		/// - `provider_account`: Account of the provider (must have verified identity)
 		/// - `service_types`: Types of services offered
-		/// - `evidence_info`: Evidence information supporting the provider's credentials,
-		///   must include the location where any off-chain evidence is stored
-		///   for future reference and auditability
+		/// - `evidence_info`: Evidence information supporting the provider's credentials, must
+		///   include the location where any off-chain evidence is stored for future reference and
+		///   auditability
 		/// - `evidence_hash`: Optional hash of evidence supporting the provider's credentials,
-		///   where the actual evidence is stored off-chain, and its location should be
-		///   referenced in the evidence_info field
+		///   where the actual evidence is stored off-chain, and its location should be referenced
+		///   in the evidence_info field
 		///
 		/// Emits `ServiceProviderSet` event when successful.
 		#[pallet::call_index(17)]
@@ -2451,7 +2474,8 @@ pub mod pallet {
 			// Check that the caller has a verified identity
 			ensure!(T::IdentityRegistrar::has_identity(&who), Error::<T>::IdentityNotVerified);
 
-			// Ensure the caller has at least the minimum rank required to register a service provider
+			// Ensure the caller has at least the minimum rank required to register a service
+			// provider
 			ensure!(
 				T::RankChecker::has_minimum_rank(&who, T::MinRankForProviderRegistry::get()),
 				Error::<T>::InsufficientRank
@@ -2497,7 +2521,8 @@ pub mod pallet {
 		/// - `provider_account`: Account of the service provider (must be registered)
 		/// - `service_types`: Types of professional services being referred
 		/// - `description`: Description of the referral
-		/// - `compensation_disclosed`: Whether the referrer disclosed receiving compensation for this referral (transparency requirement)
+		/// - `compensation_disclosed`: Whether the referrer disclosed receiving compensation for
+		///   this referral (transparency requirement)
 		/// - `compensation_details`: Details of compensation if disclosed
 		/// - `evidence_hash`: Optional hash of evidence supporting the referral
 		///

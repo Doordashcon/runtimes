@@ -20,16 +20,15 @@
 #![cfg(feature = "runtime-benchmarks")]
 
 use super::*;
-use crate::Pallet as AmbassadorGovernance;
 use crate::{
-	AppealDetails, EmergencyDetails, IntegrationDetails, ServiceProviderDetails, ServiceReferral,
+	AppealDetails, EmergencyDetails, IntegrationDetails, Pallet as AmbassadorGovernance,
+	ServiceProviderDetails, ServiceReferral,
 };
 use frame_benchmarking::{account, benchmarks, impl_benchmark_test_suite, whitelisted_caller};
 use frame_support::{assert_ok, traits::ConstU32, BoundedVec};
 use frame_system::RawOrigin;
 use sp_core::H256;
-use sp_runtime::print;
-use sp_runtime::traits::Hash;
+use sp_runtime::{print, traits::Hash};
 use sp_std::vec::Vec;
 const SEED: u32 = 0;
 
