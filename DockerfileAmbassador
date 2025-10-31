@@ -1,0 +1,64 @@
+FROM ubuntu:latest
+
+# Avoid prompts from apt
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    curl \
+    git \
+    libssl-dev \
+    pkg-config \
+    clang \
+    llvm \
+    libclang-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a non-root user
+RUN useradd -m -s /bin/bash ambassador
+USER ambassador
+WORKDIR /home/ambassador
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/home/ambassador/.cargo/bin:${PATH}"
+
+# Add WebAssembly target
+RUN rustup default stable && \
+    rustup update && \
+    rustup target add wasm32-unknown-unknown && \
+    rustup update nightly && \
+    rustup target add wasm32-unknown-unknown --toolchain nightly
+
+# Install frame-omni-bencher
+RUN cargo install frame-omni-bencher --locked
+
+# Set up working directory for the project
+USER root
+RUN mkdir -p /app && chown -R ambassador:ambassador /app
+USER ambassador
+WORKDIR /app
+
+# Download the weight template
+RUN curl https://raw.githubusercontent.com/paritytech/polkadot-sdk/master/substrate/.maintain/frame-weight-template.hbs \
+    --output /app/frame-weight-template.hbs
+
+# Copy entrypoint script
+USER root
+COPY --chown=ambassador:ambassador docker-entrypoint.sh /app/
+RUN chmod +x /app/docker-entrypoint.sh
+USER ambassador
+
+# Set up environment variables
+ENV RUST_BACKTRACE=1
+
+# Create a volume for the code
+VOLUME ["/app/runtimes"]
+
+# Set entrypoint
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+
+# Default command
+CMD ["help"]

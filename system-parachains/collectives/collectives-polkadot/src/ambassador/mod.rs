@@ -30,6 +30,7 @@
 mod migration;
 pub mod origins;
 mod tracks;
+pub mod identity;
 
 pub use origins::pallet_origins as pallet_ambassador_origins;
 
@@ -47,7 +48,7 @@ use pallet_ranked_collective::{Rank, Votes};
 use polkadot_runtime_common::impls::{LocatableAssetConverter, VersionedLocationConverter};
 use polkadot_runtime_constants::time::HOURS;
 use sp_runtime::{
-	traits::{CheckedReduceBy, Convert, IdentityLookup, Replace},
+	traits::{CheckedReduceBy, Convert, IdentityLookup, MaybeConvert, Replace},
 	Permill,
 };
 use xcm::prelude::*;

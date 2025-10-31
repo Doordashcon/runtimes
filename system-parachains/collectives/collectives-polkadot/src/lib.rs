@@ -47,6 +47,9 @@ pub mod xcm_config;
 // Fellowship configurations.
 pub mod fellowship;
 pub use ambassador::pallet_ambassador_origins;
+pub use ambassador::origins::EnsureAmbassadorsFrom;
+pub use ambassador::ranks;
+pub use ambassador::identity::{AmbassadorIdentityVerifier, AmbassadorRankChecker};
 
 // Secretary Configuration
 pub mod secretary;
@@ -94,6 +97,9 @@ use frame_system::{
 use parachains_common::{
 	message_queue::*, AccountId, AuraId, Balance, BlockNumber, Hash, Header, Nonce, Signature,
 };
+use sp_runtime::traits::Verify;
+use frame_support::instances::Instance1;
+use pallet_identity::legacy::IdentityInfo;
 use sp_runtime::RuntimeDebug;
 use system_parachains_constants::{
 	polkadot::{account::*, consensus::*, currency::*, fee::WeightToFee},
@@ -110,6 +116,8 @@ pub use sp_runtime::BuildStorage;
 
 // Polkadot imports
 use pallet_xcm::{EnsureXcm, IsVoiceOfBody};
+use pallet_ambassador_governance;
+use pallet_identity;
 use polkadot_runtime_common::{BlockHashCount, SlowAdjustingFeeUpdate};
 use xcm::prelude::*;
 use xcm_runtime_apis::{
@@ -741,6 +749,35 @@ impl pallet_asset_rate::Config for Runtime {
 	type BenchmarkHelper = polkadot_runtime_common::impls::benchmarks::AssetRateArguments;
 }
 
+parameter_types! {
+	pub const MaxAdditionalFields: u32 = 100;
+	pub const MaxRegistrars: u32 = 20;
+	pub const MaxSubAccounts: u32 = 100;
+}
+
+impl pallet_identity::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
+	type BasicDeposit = DepositBase;
+	type ByteDeposit = DepositFactor;
+	type SubAccountDeposit = DepositFactor;
+	type MaxSubAccounts = MaxSubAccounts;
+	type MaxRegistrars = MaxRegistrars;
+	type Slashed = pallet_treasury::Pallet<Runtime, Instance1>;
+	type ForceOrigin = EnsureRoot<AccountId>;
+	type RegistrarOrigin = EnsureRoot<AccountId>;
+	type WeightInfo = pallet_identity::weights::SubstrateWeight<Runtime>;
+	type IdentityInformation = IdentityInfo<MaxAdditionalFields>;
+	type OffchainSignature = Signature;
+	type SigningPublicKey = <Signature as Verify>::Signer;
+	type UsernameAuthorityOrigin = EnsureRoot<AccountId>;
+	type PendingUsernameExpiration = ConstU32<100>;
+	type MaxSuffixLength = ConstU32<7>;
+	type MaxUsernameLength = ConstU32<32>;
+	type UsernameDeposit = DepositBase;
+	type UsernameGracePeriod = ConstU32<10>;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime
@@ -776,6 +813,7 @@ construct_runtime!(
 		Preimage: pallet_preimage = 43,
 		Scheduler: pallet_scheduler = 44,
 		AssetRate: pallet_asset_rate = 45,
+		Identity: pallet_identity = 46,
 
 		// The main stage.
 
@@ -802,6 +840,7 @@ construct_runtime!(
 		AmbassadorOrigins: pallet_ambassador_origins = 72,
 		AmbassadorCore: pallet_core_fellowship::<Instance2> = 73,
 		AmbassadorTreasury: pallet_treasury::<Instance2> = 74,
+		AmbassadorGovernance: pallet_ambassador_governance = 75,
 
 		// The Secretary Collective
 		// pub type SecretaryCollectiveInstance = pallet_ranked_collective::instance3;
@@ -900,6 +939,7 @@ mod benches {
 		[pallet_treasury, FellowshipTreasury]
 		[pallet_asset_rate, AssetRate]
 		[pallet_referenda, AmbassadorReferenda]
+		[pallet_ambassador_governance, AmbassadorGovernance]
 		[pallet_ranked_collective, AmbassadorCollective]
 		[pallet_core_fellowship, AmbassadorCore]
 		[pallet_treasury, AmbassadorTreasury]
@@ -1453,4 +1493,46 @@ fn scheduler_weight_is_sane() {
 
 	let large_lookup = lookup_weight(1024 * 1024);
 	assert!(large_lookup.all_lte(limit), "Must be possible to submit a large lookup");
+}
+
+parameter_types! {
+	pub const MaxJustificationLength: u32 = 10_000;
+	pub const MaxDescriptionLength: u32 = 10_000;
+	pub const MaxCommitteeMembers: u32 = 10;
+	pub const MaxParticipants: u32 = 20;
+}
+
+type EmergencyOrigin = EnsureAmbassadorsFrom<ConstU16<{ ranks::SENIOR_AMBASSADOR }>>;
+type CommitteeFormationOrigin = EnsureAmbassadorsFrom<ConstU16<{ ranks::SENIOR_AMBASSADOR }>>;
+type EmergencyResolutionOrigin = EnsureAmbassadorsFrom<ConstU16<{ ranks::SENIOR_AMBASSADOR }>>;
+type AppealSubmissionOrigin = EnsureAmbassadorsFrom<ConstU16<{ ranks::ADVOCATE_AMBASSADOR }>>;
+type AppealCommitteeOrigin = EnsureAmbassadorsFrom<ConstU16<{ ranks::SENIOR_AMBASSADOR }>>;
+type AppealDecisionOrigin = EnsureAmbassadorsFrom<ConstU16<{ ranks::SENIOR_AMBASSADOR }>>;
+type IntegrationOrigin = EnsureAmbassadorsFrom<ConstU16<{ ranks::PRINCIPAL_AMBASSADOR }>>;
+
+impl pallet_ambassador_governance::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
+	type BlockNumber = BlockNumber;
+	type EmergencyOrigin = EmergencyOrigin;
+	type CommitteeFormationOrigin = CommitteeFormationOrigin;
+	type EmergencyResolutionOrigin = EmergencyResolutionOrigin;
+	type AppealSubmissionOrigin = AppealSubmissionOrigin;
+	type AppealCommitteeOrigin = AppealCommitteeOrigin;
+	type AppealDecisionOrigin = AppealDecisionOrigin;
+	type IntegrationOrigin = IntegrationOrigin;
+	type MaxJustificationLength = MaxJustificationLength;
+	type MaxDescriptionLength = MaxDescriptionLength;
+	type MaxCommitteeMembers = MaxCommitteeMembers;
+	type MaxParticipants = MaxParticipants;
+	type WeightInfo = weights::pallet_ambassador_governance::WeightInfo<Runtime>;
+	type IdentityRegistrar = AmbassadorIdentityVerifier<Runtime>;
+	type RankChecker = AmbassadorRankChecker;
+	type MinRankForProviderRegistry = ConstU16<{ ranks::ADVOCATE_AMBASSADOR }>;
+	type MinRankForReferral = ConstU16<{ ranks::ASSOCIATE_AMBASSADOR }>;
+	type MinRankToActivateEmergencyProtocol = ConstU16<{ ranks::SENIOR_AMBASSADOR }>;
+	type MinRankToFormEmergencyCommittee = ConstU16<{ ranks::SENIOR_AMBASSADOR }>;
+	type MinRankToSubmitAppeal = ConstU16<{ ranks::ADVOCATE_AMBASSADOR }>;
+	type MinRankToFormAppealCommittee = ConstU16<{ ranks::SENIOR_AMBASSADOR }>;
+	type MinRankToEstablishIntegration = ConstU16<{ ranks::PRINCIPAL_AMBASSADOR }>;
 }
